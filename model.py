@@ -89,7 +89,7 @@ class StaticParticle:
     @staticmethod
     def _generate_scatter_rotation() -> np.ndarray:
         # Samples a change in trajectory of a particle due to Compton scattering, returning a 3D rotation
-        delta_phi = np.random.vonmises(mu=0, kappa=1)
+        delta_phi = np.random.vonmises(mu=0, kappa=1) # TODO Angles
         delta_theta = np.random.uniform(low=-np.pi/2, high=np.pi/2)
 
         rot_theta = np.array([
@@ -115,7 +115,7 @@ class StaticParticle:
 
         for _ in range(n_lor):  # For each requested LOR
             plane_phi = np.random.uniform(0, 2 * np.pi)
-            plane_theta = np.random.uniform(0, np.pi)
+            plane_theta = np.arccos(1-2*np.random.uniform(0, 1))  # Inverse Transform Sampling
 
             # Normal vector to plane, defining the LOR direction
             e_phi = np.array([
