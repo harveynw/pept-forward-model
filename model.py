@@ -88,19 +88,19 @@ class StaticParticle:
 
     @staticmethod
     def _generate_scatter_rotation() -> np.ndarray:
-        # Samples a change in trajectory of a particle due to Compton scattering, returning a 3D rotation
-        delta_phi = np.random.vonmises(mu=0, kappa=1) # TODO Angles
-        delta_theta = np.random.uniform(low=-np.pi/2, high=np.pi/2)
+        # Samples a change in trajectory of a particle due to Compton scattering, returning a 3D rotation of the z_axis
+        phi = np.random.uniform(low=0, high=2*np.pi)
+        theta = np.random.vonmises(mu=0, kappa=1)
 
         rot_theta = np.array([
             [1, 0, 0],
-            [0, np.cos(delta_theta), -np.sin(delta_theta)],
-            [0, np.sin(delta_theta), np.cos(delta_theta)]
+            [0, np.cos(theta), -np.sin(theta)],
+            [0, np.sin(theta), np.cos(theta)]
         ])
 
         rot_phi = np.array([
-            [np.cos(delta_phi), -np.sin(delta_phi), 0],
-            [np.sin(delta_phi), np.cos(delta_phi), 0],
+            [np.cos(phi), -np.sin(phi), 0],
+            [np.sin(phi), np.cos(phi), 0],
             [0, 0, 1]
         ])
 
@@ -186,7 +186,9 @@ class StaticParticle:
                     scatter_point = self.get_position_cartesian() + (np.sign(l)*first_scatter)*n
                     print('Scatter at', scatter_point)
 
-                    new_n = np.sign(l)*self._generate_scatter_rotation().dot(n)
+                    # Compute new normal (with a random rotation)
+                    change_of_basis = np.array([e_phi, e_theta, np.sign(l)*n]).transpose()
+                    new_n = change_of_basis.dot(self._generate_scatter_rotation().dot([0, 0, 1]))
 
                     if debug_ax is not None:
                         point_3d(debug_ax, scatter_point, color='darkred', label='Compton Scatter')
