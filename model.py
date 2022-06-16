@@ -3,22 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from dataclasses import dataclass
-
-
-def debug_line_3d(ax: plt.axis, start_point: np.ndarray, normal: np.ndarray, lambda_start: float, lambda_end: float,
-                  n_steps: int, **kwargs):
-    trace_param = np.linspace(start=lambda_start, stop=lambda_end, num=n_steps)
-    trace = np.array([start_point + l * normal for l in trace_param])
-    ax.plot(xs=trace[:, 0], ys=trace[:, 1], zs=trace[:, 2], **kwargs)
-
-
-def debug_point_3d(ax: plt.axis, point: np.ndarray, **kwargs):
-    ax.scatter([point[0]], [point[1]], [point[2]], **kwargs)
-
-
-def debug_arrow_3d(ax: plt.axis, origin: np.ndarray, dir: np.ndarray, **kwargs):
-    u, v, w = [dir[0]], [dir[1]], [dir[2]]
-    ax.quiver([origin[0]], [origin[1]], [origin[2]], u, v, w, **kwargs)
+from plot import point_3d, line_3d, arrow_3d
 
 
 class Detector:
@@ -105,7 +90,7 @@ class StaticParticle:
     def _generate_scatter_rotation() -> np.ndarray:
         # Samples a change in trajectory of a particle due to Compton scattering, returning a 3D rotation
         delta_phi = np.random.vonmises(mu=0, kappa=1)
-        delta_theta = np.random.uniform(low=-np.pi, high=np.pi)
+        delta_theta = np.random.uniform(low=-np.pi/2, high=np.pi/2)
 
         rot_theta = np.array([
             [1, 0, 0],
@@ -123,7 +108,7 @@ class StaticParticle:
 
     def simulate_emissions(self, detector: Detector, n_lor=0.05 * (10 ** 4), debug_ax=None):
         if debug_ax is not None:
-            debug_point_3d(debug_ax, self.get_position_cartesian(), color='r', label='Particle Position')
+            point_3d(debug_ax, self.get_position_cartesian(), color='r', label='Particle Position')
 
         impacts = []
         n_scatters = 0
@@ -178,13 +163,13 @@ class StaticParticle:
 
             ### DEBUG Plot LOR (without scattering)
             if debug_ax is not None and did_impact:
-                debug_line_3d(debug_ax, self.get_position_cartesian(), n, lambda_1, lambda_2, 50, color='grey')
+                line_3d(debug_ax, self.get_position_cartesian(), n, lambda_1, lambda_2, 50, color='grey')
 
                 impact_1, impact_2 = self.get_position_cartesian() + lambda_1 * n, \
                                      self.get_position_cartesian() + lambda_2 * n
 
-                debug_point_3d(debug_ax, impact_1, color='grey', label='Initial Trajectory')
-                debug_point_3d(debug_ax, impact_2, color='grey')
+                point_3d(debug_ax, impact_1, color='grey', label='Initial Trajectory')
+                point_3d(debug_ax, impact_2, color='grey')
             ###
 
             # Compton Scattering
@@ -201,11 +186,11 @@ class StaticParticle:
                     scatter_point = self.get_position_cartesian() + (np.sign(l)*first_scatter)*n
                     print('Scatter at', scatter_point)
 
-                    new_n = self._generate_scatter_rotation().dot(n)
+                    new_n = np.sign(l)*self._generate_scatter_rotation().dot(n)
 
                     if debug_ax is not None:
-                        debug_point_3d(debug_ax, scatter_point, color='darkred', label='Compton Scatter')
-                        debug_arrow_3d(debug_ax, scatter_point, new_n, length=0.05, color='orange')
+                        point_3d(debug_ax, scatter_point, color='darkred', label='Compton Scatter')
+                        arrow_3d(debug_ax, scatter_point, new_n, length=0.05, color='orange')
 
                     # Debug line
                     did_impact_scattered, _, scatter_lambda = detector.impact(lor_normal=new_n,
@@ -214,51 +199,24 @@ class StaticParticle:
                     if did_impact_scattered:
                         print('--> Scattering DID impact')
                         if debug_ax is not None:
-                            debug_line_3d(debug_ax, scatter_point, new_n, 0, scatter_lambda, 10, color='green')
-                            debug_point_3d(debug_ax, scatter_point + scatter_lambda*new_n, color='green',
-                                           s=5, label='New impact')
+                            line_3d(debug_ax, scatter_point, new_n, 0, scatter_lambda, 10, color='green')
+                            point_3d(debug_ax, scatter_point + scatter_lambda*new_n, color='green',
+                                     s=5, label='New impact')
 
                         final_impacts.append(scatter_point + scatter_lambda*new_n)
                         continue
                     else:
                         print('--> Scattering did NOT impact')
                         if debug_ax is not None:
-                            debug_line_3d(debug_ax, scatter_point, new_n, 0, 1, 10, color='red')
+                            line_3d(debug_ax, scatter_point, new_n, 0, 1, 10, color='red')
 
                 # No compton scattering
                 final_impacts.append(self.get_position_cartesian() + l * n)
 
             if debug_ax is not None:
-                debug_line_3d(debug_ax, final_impacts[0], -final_impacts[0]+final_impacts[1], 0, 1, 10, color='black',
-                              label='LOR')
+                line_3d(debug_ax, final_impacts[0], -final_impacts[0]+final_impacts[1], 0, 1, 10, color='black',
+                        label='LOR')
 
             impacts += [final_impacts]
 
         return impacts, n_scatters
-
-
-if __name__ == '__main__':
-    particle = StaticParticle()
-    particle.set_position_cartesian(0, 0, 0.2)
-
-    detector = CylinderDetector()
-
-    while True:
-        fig = plt.figure(figsize=(10,5))
-        ax = fig.add_subplot(111, projection='3d')
-        detector.debug_plot(ax=ax)
-
-        particle.simulate_emissions(detector=detector, debug_ax=ax)
-
-        ax.axes.set_xlim3d(left=-detector.dim_radius_cm, right=detector.dim_radius_cm)
-        ax.axes.set_ylim3d(bottom=-detector.dim_radius_cm, top=detector.dim_radius_cm)
-        ax.axes.set_zlim3d(bottom=-0.1, top=detector.dim_height_cm+0.1)
-
-        plt.title('Static Radioactive Particle in Cylinder Detector')
-        # Put a legend to the right of the current axis
-        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.show()
-
-    lors, n_impacts = particle.simulate_emissions(detector=detector, n_lor=1000)
-
-    print(len(lors), n_impacts)
