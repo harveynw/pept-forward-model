@@ -29,27 +29,23 @@ while True:
         ax.clear()
 
 
-# Plot 2: Analyse scattering rate
-# def proportions(detector: Detector, scatter_rate=2.0, n_lor=10000):
-#     p = StaticParticle()
-#     p.set_position_cartesian(0, 0, 0.2)
-#     p.scatter_rate = scatter_rate
-#
-#     lors, n_impacts = particle.simulate_emissions(detector=detector, n_lor=n_lor)
-#
-#     # Detector hit rate overall from n_lor emissions, Scattering rate given detector hit
-#     return len(lors)/n_lor, n_impacts/(2.0*len(lors))
-#
-#
-# rates = np.linspace(start=0.01, stop=5.0, num=100)
-# prop = np.array([proportions(detector=detector, scatter_rate=r) for r in rates])
-#
-# plt.figure()
-# plt.plot(rates, prop[:, 0], label='Detector hit rate')
-# plt.plot(rates, prop[:, 1], label='Scattering rate per emission')
-# plt.xlabel('Scattering rate')
-# plt.legend()
-# plt.show()
+# Plot 2: Analyse scattering rate, mainly for debugging
+def proportions(detector: Detector, scatter_rate=2.0, n_lor=10000):
+    p = StaticParticle(scatter_rate=scatter_rate)
+    p.set_position_cartesian(0, 0, 0.2)
+
+    lors, n_impacts = p.simulate_emissions(detector=detector, n_lor=n_lor)
+
+    # Detector hit rate overall from n_lor emissions, Scattering rate given detector hit
+    return len(lors)/n_lor, n_impacts/(2.0*len(lors))
 
 
-
+rates = np.linspace(start=0.001, stop=2.0, num=10)
+prop = np.array([proportions(detector=detector, scatter_rate=r) for r in rates])
+plt.figure()
+plt.plot(rates, prop[:, 0], label='Detector hit rate')
+plt.plot(rates, prop[:, 1], label='Scattering rate per emission')
+plt.xlabel(r'Scattering rate $\lambda$')
+plt.title(r'$P(\mathrm{Scattered})$ per photon emission and $P(\mathrm{LOR\:detected})$')
+plt.legend()
+plt.show()

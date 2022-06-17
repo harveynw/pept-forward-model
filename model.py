@@ -131,27 +131,6 @@ class StaticParticle:
             n = np.cross(e_phi, e_theta)
             n = n / np.linalg.norm(n)
 
-            ### DEBUG PLOTTING ###
-            # ax = plt.figure().add_subplot(projection='3d')
-            # debug_arrow_3d(ax, np.zeros(3), e_phi, label=r'$e_{\phi}$', color='r', length=0.1)
-            # debug_arrow_3d(ax, np.zeros(3), e_theta, label=r'$e_{\theta}$', color='r', length=0.1)
-            # debug_arrow_3d(ax, np.zeros(3), n, label=r'$n$', color='b', length=0.1)
-            # plt.title('Random plane basis and normal')
-            # plt.legend()
-            # plt.show()
-            # exit()
-            ###
-
-            ### DEBUG Test angle sample ###
-            # ax = plt.figure().add_subplot(projection='3d')
-            # z_axis = np.array([0.0, 0.0, 1.0])
-            # for _ in range(100):
-            #     debug_arrow_3d(ax, np.zeros(3), self._generate_scatter_rotation().dot(z_axis), length=0.1)
-            # plt.title('Random rotations of unit vector in z axis')
-            # plt.show()
-            # exit()
-            ###
-
             # Compute collisions with detector:
             did_impact, lambda_1, lambda_2 = detector.impact(lor_normal=n,
                                                              lor_annihilation=self.get_position_cartesian())
@@ -161,7 +140,6 @@ class StaticParticle:
 
             # Note lambda_1 < 0 < lambda_2 and they represent distance in cm as n is a unit vector
 
-            ### DEBUG Plot LOR (without scattering)
             if debug_ax is not None and did_impact:
                 line_3d(debug_ax, self.get_position_cartesian(), n, lambda_1, lambda_2, 50, color='grey')
 
@@ -170,7 +148,6 @@ class StaticParticle:
 
                 point_3d(debug_ax, impact_1, color='grey', label='Initial Trajectory')
                 point_3d(debug_ax, impact_2, color='grey')
-            ###
 
             # Compton Scattering
             final_impacts = []
@@ -179,12 +156,13 @@ class StaticParticle:
 
                 # Model parameter here! Exponential distribution representing chance of collision before detector impact
                 first_scatter = np.random.exponential(scale=1.0/self.scatter_rate)
+                # print(f'Exponential sample, distance={distance}, scatter_rate={self.scatter_rate}, E[\lambda]={1.0/self.scatter_rate}')
 
                 if first_scatter < distance:  # Compton scatter occurred
                     n_scatters += 1
 
                     scatter_point = self.get_position_cartesian() + (np.sign(l)*first_scatter)*n
-                    print('Scatter at', scatter_point)
+                    # print('Scatter at', scatter_point)
 
                     # Compute new normal (with a random rotation)
                     change_of_basis = np.array([e_phi, e_theta, np.sign(l)*n]).transpose()
@@ -199,7 +177,7 @@ class StaticParticle:
                                                                               lor_annihilation=scatter_point)
 
                     if did_impact_scattered:
-                        print('--> Scattering DID impact')
+                        # print('--> Scattering DID impact')
                         if debug_ax is not None:
                             line_3d(debug_ax, scatter_point, new_n, 0, scatter_lambda, 10, color='green')
                             point_3d(debug_ax, scatter_point + scatter_lambda*new_n, color='green',
@@ -208,7 +186,7 @@ class StaticParticle:
                         final_impacts.append(scatter_point + scatter_lambda*new_n)
                         continue
                     else:
-                        print('--> Scattering did NOT impact')
+                        # print('--> Scattering did NOT impact')
                         if debug_ax is not None:
                             line_3d(debug_ax, scatter_point, new_n, 0, 1, 10, color='red')
 

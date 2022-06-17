@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 
 def line_3d(ax: plt.axis, start_point: np.ndarray, normal: np.ndarray, lambda_start: float, lambda_end: float,
-                  n_steps: int, **kwargs):
+            n_steps: int, **kwargs):
     trace_param = np.linspace(start=lambda_start, stop=lambda_end, num=n_steps)
     trace = np.array([start_point + l * normal for l in trace_param])
     ax.plot(xs=trace[:, 0], ys=trace[:, 1], zs=trace[:, 2], **kwargs)
