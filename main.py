@@ -2,50 +2,98 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from model import StaticParticle, CylinderDetector, Detector
+from joblib import Parallel, delayed
 
 particle = StaticParticle()
-particle.set_position_cartesian(0, 0, 0.2)
+# particle.set_position_cartesian(0.1, 0, 0.1)
+particle.set_position_cylindrical(r=0.1, theta=0, z=0.1)
 
 detector = CylinderDetector()
 
 # Plot 1: Find an emission with Compton Scattering
-fig = plt.figure(figsize=(10, 5))
-ax = fig.add_subplot(111, projection='3d')
-while True:
-    impacts, n_scatters = particle.simulate_emissions(detector=detector, n_lor=1, debug_ax=ax)
-
-    if n_scatters > 0:  # Make sure it did occur
-        ax.axes.set_xlim3d(left=-0.1-detector.dim_radius_cm, right=0.1+detector.dim_radius_cm)
-        ax.axes.set_ylim3d(bottom=-0.1-detector.dim_radius_cm, top=0.1+detector.dim_radius_cm)
-        ax.axes.set_zlim3d(bottom=-0.1, top=detector.dim_height_cm + 0.1)
-
-        plt.title('Static Radioactive Particle in Cylinder Detector')
-        # Put a legend to the right of the current axis
-        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        detector.debug_plot(ax=ax)
-        plt.show()
-        break
-    else:  # Otherwise try again
-        ax.clear()
+# fig = plt.figure(figsize=(10, 5))
+# ax = fig.add_subplot(111, projection='3d')
+# while True:
+#     impacts, n_scatters = particle.simulate_emissions(detector=detector, n_lor=1, debug_ax=ax)
+#
+#     if n_scatters > 0:  # Make sure it did occur
+#         ax.axes.set_xlim3d(left=-0.1-detector.dim_radius_cm, right=0.1+detector.dim_radius_cm)
+#         ax.axes.set_ylim3d(bottom=-0.1-detector.dim_radius_cm, top=0.1+detector.dim_radius_cm)
+#         ax.axes.set_zlim3d(bottom=-0.1, top=detector.dim_height_cm + 0.1)
+#
+#         plt.title('Static Radioactive Particle in Cylinder Detector')
+#         # Put a legend to the right of the current axis
+#         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+#         detector.debug_plot(ax=ax)
+#         plt.show()
+#         break
+#     else:  # Otherwise try again
+#         ax.clear()
 
 
 # Plot 2: Analyse scattering rate, mainly for debugging
-def proportions(detector: Detector, scatter_rate=2.0, n_lor=10000):
-    p = StaticParticle(scatter_rate=scatter_rate)
-    p.set_position_cartesian(0, 0, 0.2)
+# def proportions(detector: Detector, scatter_rate=2.0, n_lor=10000):
+#     p = StaticParticle(scatter_rate=scatter_rate)
+#     p.set_position_cartesian(0, 0, 0.2)
+#
+#     lors, n_impacts = p.simulate_emissions(detector=detector, n_lor=n_lor)
+#
+#     # Detector hit rate overall from n_lor emissions, Scattering rate given detector hit
+#     return len(lors)/n_lor, n_impacts/(2.0*len(lors))
+#
+#
+# rates = np.linspace(start=0.001, stop=2.0, num=10)
+# prop = np.array([proportions(detector=detector, scatter_rate=r) for r in rates])
+# plt.figure()
+# plt.plot(rates, prop[:, 0], label='Detector hit rate')
+# plt.plot(rates, prop[:, 1], label='Scattering rate per emission')
+# plt.xlabel(r'Scattering rate $\lambda$')
+# plt.title(r'$P(\mathrm{Scattered})$ per photon emission and $P(\mathrm{LOR\:detected})$')
+# plt.legend()
+# plt.show()
 
-    lors, n_impacts = p.simulate_emissions(detector=detector, n_lor=n_lor)
 
-    # Detector hit rate overall from n_lor emissions, Scattering rate given detector hit
-    return len(lors)/n_lor, n_impacts/(2.0*len(lors))
+# Plot 3: Detector hit rate as a function of particle position, takes a couples of minutes on an M1 Pro CPU
+def plot_3_sample_hit_rate(detector: Detector, r: float, z: float, n_lor=1000):
+    p = StaticParticle()
+    p.set_position_cylindrical(r=r, theta=0.0, z=z)
+    lors, _ = p.simulate_emissions(detector=detector, n_lor=n_lor)
+    return len(lors)/n_lor
 
 
-rates = np.linspace(start=0.001, stop=2.0, num=10)
-prop = np.array([proportions(detector=detector, scatter_rate=r) for r in rates])
-plt.figure()
-plt.plot(rates, prop[:, 0], label='Detector hit rate')
-plt.plot(rates, prop[:, 1], label='Scattering rate per emission')
-plt.xlabel(r'Scattering rate $\lambda$')
-plt.title(r'$P(\mathrm{Scattered})$ per photon emission and $P(\mathrm{LOR\:detected})$')
-plt.legend()
+N = 100
+r = np.linspace(start=-detector.dim_radius_cm+0.01, stop=detector.dim_radius_cm-0.01, num=N)
+z = np.linspace(start=-0.1, stop=detector.dim_height_cm+0.1, num=N)
+
+rr, zz = np.meshgrid(r, z, indexing='ij')
+hit_rate = Parallel(n_jobs=-1)(delayed(plot_3_sample_hit_rate)(detector, rr[i, j], zz[i, j]) for j in range(N) for i in range(N))
+hit_rate = np.array(hit_rate).reshape((N, N))
+h = plt.contourf(r, z, hit_rate)
+
+plt.title('LOR Detection Rate as a function of Particle Position')
+plt.xlabel('Radial position, r')
+plt.ylabel('z')
+plt.colorbar()
 plt.show()
+
+
+# Plot 4: Debugging symmetry along z-axis
+def plot_4_sample_hit_rate(z=0.0, r=0.0):
+    p = StaticParticle()
+    p.set_position_cylindrical(r=r, theta=0.0, z=z)
+    d = CylinderDetector()
+
+    n_lors = 10000
+
+    lors, _ = p.simulate_emissions(detector=d, n_lor=n_lors)
+    return len(lors)/n_lors
+
+
+zz = np.linspace(-0.5, 1.0, 100)
+hit_rates = Parallel(n_jobs=-1)(delayed(plot_4_sample_hit_rate)(z) for z in zz)
+plt.vlines([0.0, 0.5], ymin=0.0, ymax=max(hit_rates))
+plt.plot(zz, hit_rates)
+plt.title('Hit rate against z coordinate')
+plt.xlabel('z')
+plt.show()
+

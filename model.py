@@ -8,7 +8,11 @@ from plot import point_3d, line_3d, arrow_3d
 
 class Detector:
     @abc.abstractmethod
-    def impact(self, lor_normal: np.ndarray, lor_annihilation: np.ndarray):
+    def impact(self, lor_normal: np.ndarray, lor_annihilation: np.ndarray) -> (bool, float, float):
+        pass
+
+    @abc.abstractmethod
+    def impact_forward_only(self, lor_normal: np.ndarray, lor_annihilation: np.ndarray) -> (bool, float):
         pass
 
 
@@ -39,6 +43,12 @@ class CylinderDetector(Detector):
 
         return did_impact, lambda_1, lambda_2
 
+    def impact_forward_only(self, lor_normal: np.ndarray, lor_annihilation: np.ndarray) -> (bool, float):
+        _, _, l = self.impact(lor_normal=lor_normal, lor_annihilation=lor_annihilation)
+
+        impact = lor_annihilation + l*lor_normal
+        return 0 < impact[2] < self.dim_height_cm, l
+
     def debug_plot(self, ax: plt.axis):
         # Plots the cylinder detector
 
@@ -67,6 +77,25 @@ class StaticParticle:
 
     # Compton Scattering Rate
     scatter_rate: float = 2.0
+
+    def set_position_cylindrical(self, r: float, theta: float, z: float):
+        # Sets the position of the particle according to the cylindrical coordinate system
+
+        self.r = np.sqrt(np.square(r) + np.square(z))
+        self.phi = theta
+        if np.sign(r) == -1:
+            self.phi += np.pi
+            r *= -1
+        self.phi = np.mod(self.phi, 2*np.pi)
+
+        if np.isclose(z, 0.0):
+            self.theta = np.pi/2
+        elif np.isclose(r, 0.0):
+            self.theta = np.pi if z < 0.0 else 0.0
+        else:
+            self.theta = np.arctan(r/z)
+            if z < 0.0:
+                self.theta += np.pi
 
     def set_position_cartesian(self, x: float, y: float, z: float):
         # Sets the position of the particle according to the cartesian coordinate system
@@ -141,28 +170,29 @@ class StaticParticle:
             # Note lambda_1 < 0 < lambda_2 and they represent distance in cm as n is a unit vector
 
             if debug_ax is not None and did_impact:
-                line_3d(debug_ax, self.get_position_cartesian(), n, lambda_1, lambda_2, 50, color='grey')
+                line_3d(debug_ax, self.get_position_cartesian(), n, lambda_1, lambda_2, 50,
+                        color='grey', label='Initial LOR')
 
                 impact_1, impact_2 = self.get_position_cartesian() + lambda_1 * n, \
                                      self.get_position_cartesian() + lambda_2 * n
 
-                point_3d(debug_ax, impact_1, color='grey', label='Initial Trajectory')
+                point_3d(debug_ax, impact_1, color='grey')
                 point_3d(debug_ax, impact_2, color='grey')
 
             # Compton Scattering
             final_impacts = []
+            was_detected = True
+
             for l in [lambda_1, lambda_2]:
                 distance = np.abs(l)
 
                 # Model parameter here! Exponential distribution representing chance of collision before detector impact
                 first_scatter = np.random.exponential(scale=1.0/self.scatter_rate)
-                # print(f'Exponential sample, distance={distance}, scatter_rate={self.scatter_rate}, E[\lambda]={1.0/self.scatter_rate}')
 
                 if first_scatter < distance:  # Compton scatter occurred
                     n_scatters += 1
 
                     scatter_point = self.get_position_cartesian() + (np.sign(l)*first_scatter)*n
-                    # print('Scatter at', scatter_point)
 
                     # Compute new normal (with a random rotation)
                     change_of_basis = np.array([e_phi, e_theta, np.sign(l)*n]).transpose()
@@ -172,31 +202,32 @@ class StaticParticle:
                         point_3d(debug_ax, scatter_point, color='darkred', label='Compton Scatter')
                         arrow_3d(debug_ax, scatter_point, new_n, length=0.05, color='orange')
 
-                    # Debug line
-                    did_impact_scattered, _, scatter_lambda = detector.impact(lor_normal=new_n,
-                                                                              lor_annihilation=scatter_point)
+                    did_impact_scattered, scatter_lambda = detector.impact_forward_only(lor_normal=new_n,
+                                                                                        lor_annihilation=scatter_point)
 
-                    if did_impact_scattered:
-                        # print('--> Scattering DID impact')
-                        if debug_ax is not None:
+                    if not did_impact_scattered:
+                        # Entire LOR is discarded
+                        was_detected = False
+
+                    if debug_ax is not None:
+                        if did_impact_scattered:
                             line_3d(debug_ax, scatter_point, new_n, 0, scatter_lambda, 10, color='green')
-                            point_3d(debug_ax, scatter_point + scatter_lambda*new_n, color='green',
+                            point_3d(debug_ax, scatter_point + scatter_lambda * new_n, color='green',
                                      s=5, label='New impact')
-
-                        final_impacts.append(scatter_point + scatter_lambda*new_n)
-                        continue
-                    else:
-                        # print('--> Scattering did NOT impact')
-                        if debug_ax is not None:
+                        else:
                             line_3d(debug_ax, scatter_point, new_n, 0, 1, 10, color='red')
 
-                # No compton scattering
-                final_impacts.append(self.get_position_cartesian() + l * n)
+                    # Final impact after scattering
+                    final_impacts.append(scatter_point + scatter_lambda*new_n)
+                else:
+                    # Original trajectory
+                    final_impacts.append(self.get_position_cartesian() + l * n)
 
-            if debug_ax is not None:
-                line_3d(debug_ax, final_impacts[0], -final_impacts[0]+final_impacts[1], 0, 1, 10, color='black',
-                        label='LOR')
+            if was_detected:
+                impacts += [final_impacts]
 
-            impacts += [final_impacts]
+                if debug_ax is not None:
+                    line_3d(debug_ax, final_impacts[0], -final_impacts[0]+final_impacts[1], 0, 1, 10, color='black',
+                            label='LOR')
 
         return impacts, n_scatters
