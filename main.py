@@ -54,7 +54,7 @@ detector = CylinderDetector()
 
 
 # Plot 3: Detector hit rate as a function of particle position, takes a couples of minutes on an M1 Pro CPU
-def plot_3_sample_hit_rate(detector: Detector, r: float, z: float, n_lor=100):
+def plot_3_sample_hit_rate(detector: Detector, r: float, z: float, n_lor=1000):
     p = StaticParticle()
     p.set_position_cylindrical(r=r, theta=0.0, z=z)
     lors, _ = p.simulate_emissions(detector=detector, n_lor=n_lor)
