@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 
 from dataclasses import dataclass
 from plot import point_3d, line_3d, arrow_3d
+from geometry import azimuth_of_point, Point
 
 
 class Detector:
@@ -13,6 +14,10 @@ class Detector:
 
     @abc.abstractmethod
     def impact_forward_only(self, lor_normal: np.ndarray, lor_annihilation: np.ndarray) -> (bool, float):
+        pass
+
+    @abc.abstractmethod
+    def detector_cell_from_impact(self, impact: np.ndarray) -> (int, int):
         pass
 
 
@@ -49,6 +54,12 @@ class CylinderDetector(Detector):
         impact = lor_annihilation + l*lor_normal
         return 0 < impact[2] < self.dim_height_cm, l
 
+    def detector_cell_from_impact(self, impact: np.ndarray) -> (int, int):
+        # Impact MUST lie on detector, otherwise this function is undefined
+        x, y, z = impact
+
+        phi = azimuth_of_point(x, y)
+
     def debug_plot(self, ax: plt.axis):
         # Plots the cylinder detector
 
@@ -69,51 +80,10 @@ class CylinderDetector(Detector):
 
 
 @dataclass
-class StaticParticle:
-    # Store position in spherical coordinates (r, θ, φ)
-    r: float = 0.0
-    theta: float = 0.0
-    phi: float = 0.0
+class StaticParticle(Point):
 
     # Compton Scattering Rate
     scatter_rate: float = 2.0
-
-    def set_position_cylindrical(self, r: float, theta: float, z: float):
-        # Sets the position of the particle according to the cylindrical coordinate system
-
-        self.r = np.sqrt(np.square(r) + np.square(z))
-        self.phi = theta
-        if np.sign(r) == -1:
-            self.phi += np.pi
-            r *= -1
-        self.phi = np.mod(self.phi, 2*np.pi)
-
-        if np.isclose(z, 0.0):
-            self.theta = np.pi/2
-        elif np.isclose(r, 0.0):
-            self.theta = np.pi if z < 0.0 else 0.0
-        else:
-            self.theta = np.arctan(r/z)
-            if z < 0.0:
-                self.theta += np.pi
-
-    def set_position_cartesian(self, x: float, y: float, z: float):
-        # Sets the position of the particle according to the cartesian coordinate system
-        self.r = np.sqrt(np.square(x) + np.square(y) + np.square(z))
-        self.theta = np.arccos(z / self.r)
-
-        if np.isclose(x, 0.0):
-            self.phi = np.pi / 2.0 if y > 0.0 else -np.pi / 2.0
-        elif x > 0.0:
-            self.phi = np.arctan(y / x)
-        else:
-            self.phi = np.arctan(y / x) + np.pi if y >= 0.0 else -np.pi
-
-    def get_position_cartesian(self):
-        x = self.r * np.cos(self.phi) * np.sin(self.theta)
-        y = self.r * np.sin(self.phi) * np.sin(self.theta)
-        z = self.r * np.cos(self.theta)
-        return np.array([x, y, z])
 
     @staticmethod
     def _generate_scatter_rotation() -> np.ndarray:
