@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+from geometry import azimuth_of_point
 from model import StaticParticle, CylinderDetector, Detector
 from joblib import Parallel, delayed
 
@@ -54,46 +55,87 @@ detector = CylinderDetector()
 
 
 # Plot 3: Detector hit rate as a function of particle position, takes a couples of minutes on an M1 Pro CPU
-def plot_3_sample_hit_rate(detector: Detector, r: float, z: float, n_lor=1000):
-    p = StaticParticle()
-    p.set_position_cylindrical(r=r, theta=0.0, z=z)
-    lors, _ = p.simulate_emissions(detector=detector, n_lor=n_lor)
-    return len(lors)/n_lor
-
-
-N = 100
-r = np.linspace(start=-detector.dim_radius_cm+0.01, stop=detector.dim_radius_cm-0.01, num=N)
-z = np.linspace(start=-0.1, stop=detector.dim_height_cm+0.1, num=N)
-
-rr, zz = np.meshgrid(r, z, indexing='ij')
-hit_rate = Parallel(n_jobs=-1)(delayed(plot_3_sample_hit_rate)(detector, rr[i, j], zz[i, j]) for j in range(N) for i in range(N))
-hit_rate = np.array(hit_rate).reshape((N, N))
-h = plt.contourf(r, z, hit_rate)
-
-plt.title('LOR Detection Rate as a function of Particle Position')
-plt.xlabel('Radial position, r')
-plt.ylabel('z')
-plt.colorbar()
-plt.show()
+# def plot_3_sample_hit_rate(detector: Detector, r: float, z: float, n_lor=1000):
+#     p = StaticParticle()
+#     p.set_position_cylindrical(r=r, theta=0.0, z=z)
+#     lors, _ = p.simulate_emissions(detector=detector, n_lor=n_lor)
+#     return len(lors)/n_lor
+#
+#
+# N = 100
+# r = np.linspace(start=-detector.dim_radius_cm+0.01, stop=detector.dim_radius_cm-0.01, num=N)
+# z = np.linspace(start=-0.1, stop=detector.dim_height_cm+0.1, num=N)
+#
+# rr, zz = np.meshgrid(r, z, indexing='ij')
+# hit_rate = Parallel(n_jobs=-1)(delayed(plot_3_sample_hit_rate)(detector, rr[i, j], zz[i, j]) for j in range(N) for i in range(N))
+# hit_rate = np.array(hit_rate).reshape((N, N))
+# h = plt.contourf(r, z, hit_rate)
+#
+# plt.title('LOR Detection Rate as a function of Particle Position')
+# plt.xlabel('Radial position, r')
+# plt.ylabel('z')
+# plt.colorbar()
+# plt.show()
 
 
 # Plot 4: Debugging symmetry along z-axis
-def plot_4_sample_hit_rate(z=0.0, r=0.0):
-    p = StaticParticle()
-    p.set_position_cylindrical(r=r, theta=0.0, z=z)
-    d = CylinderDetector()
+# def plot_4_sample_hit_rate(z=0.0, r=0.0):
+#     p = StaticParticle()
+#     p.set_position_cylindrical(r=r, theta=0.0, z=z)
+#     d = CylinderDetector()
+#
+#     n_lors = 10000
+#
+#     lors, _ = p.simulate_emissions(detector=d, n_lor=n_lors)
+#     return len(lors)/n_lors
+#
+#
+# zz = np.linspace(-0.5, 1.0, 100)
+# hit_rates = Parallel(n_jobs=-1)(delayed(plot_4_sample_hit_rate)(z) for z in zz)
+# plt.vlines([0.0, 0.5], ymin=0.0, ymax=max(hit_rates))
+# plt.plot(zz, hit_rates)
+# plt.title('Hit rate against z coordinate')
+# plt.xlabel('z')
+# plt.show()
 
-    n_lors = 10000
+# Plot 5: Detector cell analysis
+d5 = CylinderDetector()
+cells_hit_counts = np.zeros(shape=d5.n_detector_cells(), dtype=int)
+print(cells_hit_counts.shape)
+p5 = StaticParticle()
+p5.set_position_cylindrical(r=0.0, theta=np.pi/2, z=0.25)
+p5.scatter_rate = 100
 
-    lors, _ = p.simulate_emissions(detector=d, n_lor=n_lors)
-    return len(lors)/n_lors
+n_batches = 8
+n_lor = 1000000
+sims = Parallel(n_jobs=-1)(delayed(p5.simulate_emissions)(detector=d5, n_lor=n_lor) for _ in range(n_batches))
 
+lors = sum([sim[0] for sim in sims], [])
+scatters = sum([sim[1] for sim in sims])
 
-zz = np.linspace(-0.5, 1.0, 100)
-hit_rates = Parallel(n_jobs=-1)(delayed(plot_4_sample_hit_rate)(z) for z in zz)
-plt.vlines([0.0, 0.5], ymin=0.0, ymax=max(hit_rates))
-plt.plot(zz, hit_rates)
-plt.title('Hit rate against z coordinate')
-plt.xlabel('z')
+print('Statistics', scatters, len(lors), scatters/len(lors))
+
+for lor in lors:
+    for impact in lor:
+        i, j = d5.detector_cell_from_impact(impact=impact)
+        cells_hit_counts[i, j] += 1
+
+plt.imshow(cells_hit_counts.transpose())
+plt.title(f'Detector Hit Count for particle at r={p5.r:0.4f}, φ={p5.phi:0.4f}, Θ={p5.theta:0.4f}')
+plt.xlabel('Horizontal')
+plt.ylabel('Vertical')
 plt.show()
 
+# Plot 6: Detector cell analysis in another way
+x_plot, y_plot = [], []
+for lor in lors:
+    for impact in lor:
+        x, y, z = impact
+        x_plot.append(azimuth_of_point(x, y))
+        y_plot.append(z)
+
+plt.hist2d(x_plot, y_plot, (314, 100), cmap=plt.cm.jet)
+plt.title('Detector Hit Count')
+plt.xlabel('Horizontal')
+plt.ylabel('Vertical')
+plt.show()

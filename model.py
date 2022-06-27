@@ -42,7 +42,7 @@ class CylinderDetector(Detector):
         if lambda_2 < lambda_1:
             lambda_1, lambda_2 = lambda_2, lambda_1
 
-        impact_1, impact_2 = lor_annihilation + lambda_1*lor_normal, lor_annihilation + lambda_2*lor_normal
+        impact_1, impact_2 = lor_annihilation + lambda_1 * lor_normal, lor_annihilation + lambda_2 * lor_normal
 
         did_impact = (0 < impact_1[2] < self.dim_height_cm) and (0 < impact_2[2] < self.dim_height_cm)
 
@@ -51,14 +51,24 @@ class CylinderDetector(Detector):
     def impact_forward_only(self, lor_normal: np.ndarray, lor_annihilation: np.ndarray) -> (bool, float):
         _, _, l = self.impact(lor_normal=lor_normal, lor_annihilation=lor_annihilation)
 
-        impact = lor_annihilation + l*lor_normal
+        impact = lor_annihilation + l * lor_normal
         return 0 < impact[2] < self.dim_height_cm, l
+
+    def n_detector_cells(self) -> (int, int):
+        n_horizontal = np.rint(2 * np.pi * self.dim_radius_cm / self.detectors_width)
+        n_vertical = np.rint(self.dim_height_cm / self.detectors_height)
+        return int(n_horizontal), int(n_vertical)
 
     def detector_cell_from_impact(self, impact: np.ndarray) -> (int, int):
         # Impact MUST lie on detector, otherwise this function is undefined
         x, y, z = impact
-
         phi = azimuth_of_point(x, y)
+
+        n_horizontal, n_vertical = self.n_detector_cells()
+
+        detector_i = np.floor(phi / (2 * np.pi) * n_horizontal)
+        detector_j = np.floor(z / self.dim_height_cm * n_vertical)
+        return int(detector_i), int(detector_j)
 
     def debug_plot(self, ax: plt.axis):
         # Plots the cylinder detector
@@ -81,14 +91,13 @@ class CylinderDetector(Detector):
 
 @dataclass
 class StaticParticle(Point):
-
     # Compton Scattering Rate
     scatter_rate: float = 2.0
 
     @staticmethod
     def _generate_scatter_rotation() -> np.ndarray:
         # Samples a change in trajectory of a particle due to Compton scattering, returning a 3D rotation of the z_axis
-        phi = np.random.uniform(low=0, high=2*np.pi)
+        phi = np.random.uniform(low=0, high=2 * np.pi)
         theta = np.random.vonmises(mu=0, kappa=1)
 
         rot_theta = np.array([
@@ -114,7 +123,7 @@ class StaticParticle(Point):
 
         for _ in range(n_lor):  # For each requested LOR
             plane_phi = np.random.uniform(0, 2 * np.pi)
-            plane_theta = np.arccos(1-2*np.random.uniform(0, 1))  # Inverse Transform Sampling
+            plane_theta = np.arccos(1 - 2 * np.random.uniform(0, 1))  # Inverse Transform Sampling
 
             # Normal vector to plane, defining the LOR direction
             e_phi = np.array([
@@ -157,15 +166,15 @@ class StaticParticle(Point):
                 distance = np.abs(l)
 
                 # Model parameter here! Exponential distribution representing chance of collision before detector impact
-                first_scatter = np.random.exponential(scale=1.0/self.scatter_rate)
+                first_scatter = np.random.exponential(scale=1.0 / self.scatter_rate)
 
                 if first_scatter < distance:  # Compton scatter occurred
                     n_scatters += 1
 
-                    scatter_point = self.get_position_cartesian() + (np.sign(l)*first_scatter)*n
+                    scatter_point = self.get_position_cartesian() + (np.sign(l) * first_scatter) * n
 
                     # Compute new normal (with a random rotation)
-                    change_of_basis = np.array([e_phi, e_theta, np.sign(l)*n]).transpose()
+                    change_of_basis = np.array([e_phi, e_theta, np.sign(l) * n]).transpose()
                     new_n = change_of_basis.dot(self._generate_scatter_rotation().dot([0, 0, 1]))
 
                     if debug_ax is not None:
@@ -188,7 +197,7 @@ class StaticParticle(Point):
                             line_3d(debug_ax, scatter_point, new_n, 0, 1, 10, color='red')
 
                     # Final impact after scattering
-                    final_impacts.append(scatter_point + scatter_lambda*new_n)
+                    final_impacts.append(scatter_point + scatter_lambda * new_n)
                 else:
                     # Original trajectory
                     final_impacts.append(self.get_position_cartesian() + l * n)
@@ -197,7 +206,7 @@ class StaticParticle(Point):
                 impacts += [final_impacts]
 
                 if debug_ax is not None:
-                    line_3d(debug_ax, final_impacts[0], -final_impacts[0]+final_impacts[1], 0, 1, 10, color='black',
+                    line_3d(debug_ax, final_impacts[0], -final_impacts[0] + final_impacts[1], 0, 1, 10, color='black',
                             label='LOR')
 
         return impacts, n_scatters
