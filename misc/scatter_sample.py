@@ -13,7 +13,7 @@ arrow_3d(ax=ax, origin=[0, 0, 0], dir=[0, 0, 2], color='red')
 points = []
 for _ in range(1000):
     phi = np.random.uniform(low=0, high=2 * np.pi)
-    theta = np.random.vonmises(mu=0, kappa=100)
+    theta = np.random.vonmises(mu=0, kappa=1)
 
     rot_theta = np.array([
         [1, 0, 0],
@@ -28,7 +28,6 @@ for _ in range(1000):
     ])
 
     points += [np.matmul(rot_phi, rot_theta).dot([0, 0, 1])]
-    # arrow_3d(ax=ax, origin=[0, 0, 0], dir=np.matmul(rot_phi, rot_theta).dot([0, 0, 1]))
 
 points_3d(ax=ax, points=np.array(points))
 ax.axes.set_xlim3d(left=-2.0, right=2.0)

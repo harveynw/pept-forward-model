@@ -9,7 +9,7 @@ fig = plt.figure(figsize=(10, 5))
 ax = fig.add_subplot(111, projection='3d')
 
 vecs = []
-for _ in range(500):
+for _ in range(5000):
     phi = np.random.uniform(0, 2 * np.pi)
     theta = np.arccos(1-2*np.random.uniform(0, 1))
     vecs.append([np.cos(phi)*np.sin(theta), np.sin(phi)*np.sin(theta), np.cos(theta)])
