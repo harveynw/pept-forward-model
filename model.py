@@ -86,7 +86,7 @@ class CylinderDetector(Detector):
         x_grid = self.dim_radius_cm * np.cos(theta_grid)  # + center_x
         y_grid = self.dim_radius_cm * np.sin(theta_grid)  # + center_y
 
-        ax.plot_surface(x_grid, y_grid, z_grid, alpha=0.5)
+        ax.plot_surface(x_grid, y_grid, z_grid, alpha=0.2)
 
 
 @dataclass
@@ -133,7 +133,7 @@ class StaticParticle(Point):
             ])
             e_theta = np.array([
                 -np.sin(plane_theta) * np.sin(plane_phi),
-                np.sin(plane_theta * np.cos(plane_phi)),
+                np.sin(plane_theta) * np.cos(plane_phi),
                 np.square(np.cos(plane_theta))
             ])
             n = np.cross(e_phi, e_theta)
@@ -190,7 +190,7 @@ class StaticParticle(Point):
 
                     if debug_ax is not None:
                         if did_impact_scattered:
-                            line_3d(debug_ax, scatter_point, new_n, 0, scatter_lambda, 10, color='green')
+                            line_3d(debug_ax, scatter_point, new_n, 0, scatter_lambda, 10, color='orange')
                             point_3d(debug_ax, scatter_point + scatter_lambda * new_n, color='green',
                                      s=5, label='New impact')
                         else:

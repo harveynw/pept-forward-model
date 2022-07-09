@@ -18,13 +18,14 @@ detector = CylinderDetector()
 #     impacts, n_scatters = particle.simulate_emissions(detector=detector, n_lor=1, debug_ax=ax)
 #
 #     if n_scatters > 0:  # Make sure it did occur
-#         ax.axes.set_xlim3d(left=-0.1-detector.dim_radius_cm, right=0.1+detector.dim_radius_cm)
-#         ax.axes.set_ylim3d(bottom=-0.1-detector.dim_radius_cm, top=0.1+detector.dim_radius_cm)
-#         ax.axes.set_zlim3d(bottom=-0.1, top=detector.dim_height_cm + 0.1)
+#         ax.axes.set_xlim3d(left=-0.01-detector.dim_radius_cm, right=0.01+detector.dim_radius_cm)
+#         ax.axes.set_ylim3d(bottom=-0.01-detector.dim_radius_cm, top=0.01+detector.dim_radius_cm)
+#         ax.axes.set_zlim3d(bottom=-0.01, top=detector.dim_height_cm + 0.01)
 #
 #         plt.title('Static Radioactive Particle in Cylinder Detector')
 #         # Put a legend to the right of the current axis
-#         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+#         # ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+#         ax.view_init(azim=45, elev=30)
 #         detector.debug_plot(ax=ax)
 #         plt.show()
 #         break
@@ -104,10 +105,11 @@ cells_hit_counts = np.zeros(shape=d5.n_detector_cells(), dtype=int)
 print(cells_hit_counts.shape)
 p5 = StaticParticle()
 p5.set_position_cylindrical(r=0.0, theta=np.pi/2, z=0.25)
-p5.scatter_rate = 100
+p5.scatter_rate = 1000
 
+lors, scatters = p5.simulate_emissions(detector=d5, n_lor=1000000)
 n_batches = 8
-n_lor = 1000000
+n_lor = 100
 sims = Parallel(n_jobs=-1)(delayed(p5.simulate_emissions)(detector=d5, n_lor=n_lor) for _ in range(n_batches))
 
 lors = sum([sim[0] for sim in sims], [])
