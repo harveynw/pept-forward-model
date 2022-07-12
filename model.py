@@ -123,7 +123,7 @@ class StaticParticle(Point):
 
         for _ in range(n_lor):  # For each requested LOR
             plane_phi = np.random.uniform(0, 2 * np.pi)
-            plane_theta = np.arccos(1 - 2 * np.random.uniform(0, 1))  # Inverse Transform Sampling
+            plane_theta_hat = np.arcsin(2 * np.random.uniform(0, 1) - 1)  # Inverse Transform Sampling
 
             # Normal vector to plane, defining the LOR direction
             e_phi = np.array([
@@ -132,9 +132,9 @@ class StaticParticle(Point):
                 0.0
             ])
             e_theta = np.array([
-                -np.sin(plane_theta) * np.sin(plane_phi),
-                np.sin(plane_theta) * np.cos(plane_phi),
-                np.square(np.cos(plane_theta))
+                np.sin(plane_theta_hat) * np.cos(plane_phi + np.pi / 2),
+                np.sin(plane_theta_hat) * np.sin(plane_phi + np.pi / 2),
+                np.cos(plane_theta_hat)
             ])
             n = np.cross(e_phi, e_theta)
             n = n / np.linalg.norm(n)
@@ -160,6 +160,7 @@ class StaticParticle(Point):
 
             # Compton Scattering
             final_impacts = []
+            final_scatter_count = 0
             was_detected = True
 
             for l in [lambda_1, lambda_2]:
@@ -169,7 +170,7 @@ class StaticParticle(Point):
                 first_scatter = np.random.exponential(scale=1.0 / self.scatter_rate)
 
                 if first_scatter < distance:  # Compton scatter occurred
-                    n_scatters += 1
+                    final_scatter_count += 1
 
                     scatter_point = self.get_position_cartesian() + (np.sign(l) * first_scatter) * n
 
@@ -204,6 +205,7 @@ class StaticParticle(Point):
 
             if was_detected:
                 impacts += [final_impacts]
+                n_scatters += final_scatter_count
 
                 if debug_ax is not None:
                     line_3d(debug_ax, final_impacts[0], -final_impacts[0] + final_impacts[1], 0, 1, 10, color='black',

@@ -56,7 +56,7 @@ detector = CylinderDetector()
 
 
 # Plot 3: Detector hit rate as a function of particle position, takes a couples of minutes on an M1 Pro CPU
-# def plot_3_sample_hit_rate(detector: Detector, r: float, z: float, n_lor=1000):
+# def plot_3_sample_hit_rate(detector: Detector, r: float, z: float, n_lor=100):
 #     p = StaticParticle()
 #     p.set_position_cylindrical(r=r, theta=0.0, z=z)
 #     lors, _ = p.simulate_emissions(detector=detector, n_lor=n_lor)
@@ -104,18 +104,21 @@ d5 = CylinderDetector()
 cells_hit_counts = np.zeros(shape=d5.n_detector_cells(), dtype=int)
 print(cells_hit_counts.shape)
 p5 = StaticParticle()
-p5.set_position_cylindrical(r=0.0, theta=np.pi/2, z=0.25)
-p5.scatter_rate = 1000
+p5.set_position_cylindrical(r=0.20, theta=np.pi/2, z=0.25)
+p5.scatter_rate = 10000
+print('Mean scattering distance:', 1/p5.scatter_rate)
 
-lors, scatters = p5.simulate_emissions(detector=d5, n_lor=1000000)
-n_batches = 8
-n_lor = 100
-sims = Parallel(n_jobs=-1)(delayed(p5.simulate_emissions)(detector=d5, n_lor=n_lor) for _ in range(n_batches))
+use_multicore = True
+if use_multicore:
+    n_batches = 8
+    n_lor = 10000
+    sims = Parallel(n_jobs=-1)(delayed(p5.simulate_emissions)(detector=d5, n_lor=n_lor) for _ in range(n_batches))
+    lors, scatters = sum([sim[0] for sim in sims], []), sum([sim[1] for sim in sims])
+else:
+    lors, scatters = p5.simulate_emissions(detector=d5, n_lor=100000)
 
-lors = sum([sim[0] for sim in sims], [])
-scatters = sum([sim[1] for sim in sims])
-
-print('Statistics', scatters, len(lors), scatters/len(lors))
+print('Statistics', scatters, len(lors), scatters/(2*len(lors)))
+scatter_rate = scatters/(2*len(lors))
 
 for lor in lors:
     for impact in lor:
@@ -124,6 +127,7 @@ for lor in lors:
 
 plt.imshow(cells_hit_counts.transpose())
 plt.title(f'Detector Hit Count for particle at r={p5.r:0.4f}, φ={p5.phi:0.4f}, Θ={p5.theta:0.4f}')
+plt.suptitle(f'Scattering rate for individual photons is {scatter_rate:.00%}')
 plt.xlabel('Horizontal')
 plt.ylabel('Vertical')
 plt.show()
