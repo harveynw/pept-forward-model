@@ -164,8 +164,8 @@ if __name__ == '__main__':
     # d.detectors_height = 0.05
 
     p = StaticParticle()
-    # p.set_position_cylindrical(r=0.9*d.dim_radius_cm, theta=1.5, z=d.dim_height_cm/2)
-    p.set_position_cylindrical(r=0.0, theta=1.5, z=d.dim_height_cm/2)
+    p.set_position_cylindrical(r=0.96*d.dim_radius_cm, theta=np.pi, z=d.dim_height_cm/2)
+    # p.set_position_cylindrical(r=0.0, theta=1.5, z=d.dim_height_cm/2)
 
     n_x, n_y = d.n_detector_cells()
 
@@ -201,10 +201,11 @@ if __name__ == '__main__':
     integral_values = np.zeros((n_x, n_y))
     xv, yv = np.meshgrid(range(n_x), range(n_y), indexing='ij')
     for i in range(n_x):
+        print(f'{i}/{n_x}')
         for j in range(n_y):
             x, y = xv[i, j], yv[i, j]
             idx = x + y*n_x
-            integral_values[i, j] = marginal_probability(d, p.get_position_cartesian(), idx, 1000)
+            integral_values[i, j] = marginal_probability(d, p.get_position_cartesian(), idx, 100)
 
     plt.imshow(integral_values.transpose(), origin='lower')
     plt.title(f'Marginal Probability given {p}')

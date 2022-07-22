@@ -104,8 +104,9 @@ d5 = CylinderDetector()
 cells_hit_counts = np.zeros(shape=d5.n_detector_cells(), dtype=int)
 print(cells_hit_counts.shape)
 p5 = StaticParticle()
-p5.set_position_cylindrical(r=0.20, theta=np.pi/2, z=0.25)
-p5.scatter_rate = 10000
+p5.set_position_cylindrical(r=0.96*d5.dim_radius_cm, theta=np.pi, z=d5.dim_height_cm/2)
+# p5.set_position_cylindrical(r=0.20, theta=np.pi/2, z=0.25)
+p5.scatter_rate = 0.001
 print('Mean scattering distance:', 1/p5.scatter_rate)
 
 use_multicore = True
@@ -126,7 +127,7 @@ for lor in lors:
         cells_hit_counts[i, j] += 1
 
 plt.imshow(cells_hit_counts.transpose())
-plt.title(f'Detector Hit Count for particle at r={p5.r:0.4f}, φ={p5.phi:0.4f}, Θ={p5.theta:0.4f}')
+plt.title(f'Detector Hit Count for particle at {p5}')
 plt.suptitle(f'Scattering rate for individual photons is {scatter_rate:.00%}')
 plt.xlabel('Horizontal')
 plt.ylabel('Vertical')
