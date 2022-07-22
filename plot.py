@@ -23,3 +23,14 @@ def points_3d(ax: plt.axis, points: np.ndarray, **kwargs):
 def arrow_3d(ax: plt.axis, origin: Union[np.ndarray, list], dir: Union[np.ndarray, list], **kwargs):
     u, v, w = [dir[0]], [dir[1]], [dir[2]]
     ax.quiver([origin[0]], [origin[1]], [origin[2]], u, v, w, **kwargs)
+
+
+def detector_plot(detector_height: float) -> (plt.Figure, plt.axis):
+    fig, ax = plt.subplots()
+    ax.set_xlim([0, 2*np.pi])
+    ax.set_ylim([0, detector_height])
+
+    ax.set_xlabel(r"$\phi$")
+    ax.set_ylabel(r"$z$")
+
+    return fig, ax

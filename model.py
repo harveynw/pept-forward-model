@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 from dataclasses import dataclass
 from plot import point_3d, line_3d, arrow_3d
-from geometry import azimuth_of_point, Point
+from geometry import azimuth_of_point, Point, Quadrilateral
 
 
 class Detector:
@@ -69,6 +69,16 @@ class CylinderDetector(Detector):
         detector_i = np.floor(phi / (2 * np.pi) * n_horizontal)
         detector_j = np.floor(z / self.dim_height_cm * n_vertical)
         return int(detector_i), int(detector_j)
+
+    def detector_cell_from_index(self, i: int):
+        # Detector cell boundaries in phi, z format
+        n_x, n_y = self.n_detector_cells()
+        assert 0 <= i < n_x * n_y
+
+        y, x = divmod(i, n_x)
+        d_x, d_y = 2*np.pi/n_x, self.dim_height_cm/n_y
+
+        return Quadrilateral.from_range([x*d_x, (x+1)*d_x], [y*d_y, (y+1)*d_y])
 
     def debug_plot(self, ax: plt.axis):
         # Plots the cylinder detector

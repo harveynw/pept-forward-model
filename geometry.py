@@ -1,4 +1,11 @@
 import numpy as np
+import shapely.geometry as sg
+
+from dataclasses import dataclass
+from typing import Union
+from matplotlib.patches import Polygon
+
+Numbers = Union[np.ndarray, tuple, list]
 
 
 # Base class for representing a point in space, supports some useful representations
@@ -29,6 +36,56 @@ class Point:
 
     def __str__(self):
         return f'Point({self.x}, {self.y}, {self.z})'
+
+
+@dataclass
+class Quadrilateral:
+    v1: Numbers
+    v2: Numbers
+    v3: Numbers
+    v4: Numbers
+
+    @classmethod
+    def from_range(cls, x_range: Numbers, y_range: Numbers):
+        return cls([x_range[0], y_range[0]],
+                   [x_range[0], y_range[1]],
+                   [x_range[1], y_range[1]],
+                   [x_range[1], y_range[0]])
+
+    def plot(self, ax, colour='r'):
+        v = self.vertices()
+        poly = Polygon(v + [v[0]], facecolor=colour)
+        ax.add_patch(poly)
+
+    def inside(self, p: Numbers) -> bool:
+        return inside_quad(p, self.vertices())
+
+    def intersects(self, quad) -> bool:
+        p1 = sg.Polygon(self.vertices())
+        p2 = sg.Polygon(quad.vertices())
+
+        return p2.intersects(p1)
+
+    def max(self):
+        # Max X, Max Y
+        v = np.array(self.vertices())
+        return np.max(v[:, 0]), np.max(v[:, 1])
+
+    def min(self):
+        # Min X, Max Y
+        v = np.array(self.vertices())
+        return np.min(v[:, 0]), np.min(v[:, 1])
+
+    def x_range(self):
+        v = np.array(self.vertices())
+        return np.min(v[:, 0]), np.max(v[:, 0])
+
+    def y_range(self):
+        v = np.array(self.vertices())
+        return np.min(v[:, 1]), np.max(v[:, 1])
+
+    def vertices(self):
+        return [self.v1, self.v2, self.v3, self.v4]
 
 
 def azimuth_of_point(x: float, y: float):
