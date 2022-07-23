@@ -1,3 +1,5 @@
+from typing import Callable
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -9,39 +11,63 @@ from plot import detector_plot
 def atan2(x1, x2):
     # Returns argument of the complex number x2+x1*i in the range [0, 2pi]
     angle = np.arctan2(x1, x2)
-    return angle if angle > 0.0 else 2*np.pi + angle
+    return angle if angle > 0.0 else 2 * np.pi + angle
+
+
+def monte_carlo_2d_integral(x_sample_range: tuple, y_sample_range: tuple, integrand: Callable[[float, float], float],
+                            rejection_func: Callable[[float, float], bool], n_samples: int = 100):
+    # Performs a monte carlo estimate ∫∫f dV ≈ V*(1/n)*∑f(x,y)
+    samples = []
+    v_count = 0
+    for _ in range(n_samples):
+        point = np.array([
+            np.random.uniform(*x_sample_range),
+            np.random.uniform(*y_sample_range)
+        ])
+
+        if rejection_func(*point):
+            continue
+
+        v_count += 1
+        samples += [integrand(*point)]
+
+    v_est = (x_sample_range[1] - x_sample_range[0]) * (y_sample_range[1] - y_sample_range[0]) * (v_count / n_samples)
+    return v_est * 1 / len(samples) * sum(samples) if len(samples) > 0 else 0.0
 
 
 def phi_2(R: float, X: np.ndarray, phi_1: float):
+    # Compute phi_2 given (phi_1, x)
     x, y, _ = X
-    phi = atan2(R*np.sin(phi_1)-y, R*np.cos(phi_1)-x)
+    phi = atan2(R * np.sin(phi_1) - y, R * np.cos(phi_1) - x)
 
-    mu_2_const = x*np.cos(phi) + y*np.sin(phi)
+    mu_2_const = x * np.cos(phi) + y * np.sin(phi)
     mu_2 = -(mu_2_const)
     mu_2 -= np.sqrt(np.square((mu_2_const)) - (np.square(x) + np.square(y) - np.square(R)))
 
-    return atan2(y+mu_2*np.cos(phi), x + mu_2*np.sin(phi))
+    return atan2(y + mu_2 * np.cos(phi), x + mu_2 * np.sin(phi))
 
 
 def z_2(R: float, X: np.ndarray, phi_1: float, z_1: float):
+    # Compute z_2 given (phi_1, z_1, x)
     x, y, z = X
-    phi = atan2(R*np.sin(phi_1)-y, R*np.cos(phi_1)-x)
+    phi = atan2(R * np.sin(phi_1) - y, R * np.cos(phi_1) - x)
 
-    l_1 = np.linalg.norm(X - np.array([R*np.cos(phi_1), R*np.sin(phi_1), z_1]))
-    theta = np.arccos((z_1-z)/l_1)
+    l_1 = np.linalg.norm(X - np.array([R * np.cos(phi_1), R * np.sin(phi_1), z_1]))
+    theta = np.arccos((z_1 - z) / l_1)
 
     l_solved = np.roots([
         np.square(np.sin(theta)),
-        2*np.sin(theta)*(x*np.cos(phi)+y*np.sin(phi)),
-        np.square(x)+np.square(y)-np.square(R)
+        2 * np.sin(theta) * (x * np.cos(phi) + y * np.sin(phi)),
+        np.square(x) + np.square(y) - np.square(R)
     ])
     l_solved.sort()
     l_2, l_1_check = l_solved
 
-    return z + l_2*np.cos(theta)
+    return z + l_2 * np.cos(theta)
 
 
 def projection_region(R: float, x: np.ndarray, detector_phi: tuple, detector_z: tuple) -> (tuple, tuple):
+    # Projects a detector cell through x, returning a new region on the detector
     phi_range = [phi_2(R, x, detector_phi[0]), phi_2(R, x, detector_phi[1])]
     phi_range.sort()
 
@@ -68,21 +94,13 @@ def joint_probability(d: CylinderDetector, x: np.ndarray, i: int, j: int, n_samp
                                       detector_phi=j_region.x_range(),
                                       detector_z=j_region.y_range())
 
-    i_phi_min, i_z_min = i_region.min()
-    j_proj_phi_min, j_proj_z_min = j_proj_region.min()
+    phi_min = min([*i_region.x_range(), *j_proj_region.x_range()])
+    phi_max = max([*i_region.x_range(), *j_proj_region.x_range()])
+    z_min = min([*i_region.y_range(), *j_proj_region.y_range()])
+    z_max = max([*i_region.y_range(), *j_proj_region.y_range()])
 
-    i_phi_max, i_z_max = i_region.max()
-    j_proj_phi_max, j_proj_z_max = j_proj_region.max()
-
-    phi_min = min(i_phi_min, j_proj_phi_min)
-    z_min = min(i_z_min, j_proj_z_min)
-
-    phi_max = max(i_phi_max, j_proj_phi_max)
-    z_max = max(i_phi_max, j_proj_phi_max)
-
-    # Estimate V (integral region volume MC style as well)
+    # Step 2: Check if there is no intersection between (i) and back-project(j)
     if not i_region.intersects(j_proj_region):
-        # print('No intersection')
         return 0.0
 
     # Debug Integration region
@@ -92,40 +110,27 @@ def joint_probability(d: CylinderDetector, x: np.ndarray, i: int, j: int, n_samp
     # ax.set_title('Integration regions')
     # plt.show()
 
-    # Estimate integral function
-    samples = []
-    v_samples = 0
-    for _ in range(n_samples):
-        point = np.array([
-            np.random.uniform(phi_min, phi_max),
-            np.random.uniform(z_min, z_max)
-        ])
+    # Step 3: Perform integration
+    R = d.dim_radius_cm
 
-        if not (i_region.inside(point) and j_proj_region.inside(point)):
-            # Rejection Sampling
-            continue
-        else:
-            v_samples += 1
+    def integrand(phi, z):
+        frac = np.square(z - x[2])
+        frac /= np.square(x[0] - R * np.cos(phi)) + np.square(x[1] - R * np.sin(phi)) + np.square(z - x[2])
+        return 1 / (4 * np.pi) * np.sqrt(1 - frac)
 
-        samp_phi, samp_z = point
+    def rejection_func(phi, z):
+        return not (i_region.inside([phi, z]) and j_proj_region.inside([phi, z]))
 
-        # Evaluate Integral
-        R = d.dim_radius_cm
-        frac = np.square(samp_z-x[2])
-        frac /= np.square(x[0]-R*np.cos(samp_phi)) + np.square(x[1]-R*np.sin(samp_phi)) + np.square(samp_z-x[2])
-        samples += [1/(4*np.pi) * np.sqrt(1-frac)]
-
-    # Final Monte Carlo Estimate
-    v_est = (phi_max - phi_min)*(z_max-z_min) * (v_samples/n_samples)
-    return v_est * 1/len(samples) * sum(samples) if len(samples) > 0 else 0.0
+    return monte_carlo_2d_integral(x_sample_range=(phi_min, phi_max),
+                                   y_sample_range=(z_min, z_max),
+                                   integrand=integrand,
+                                   rejection_func=rejection_func,
+                                   n_samples=n_samples)
 
 
 def marginal_probability(d: CylinderDetector, x: np.ndarray, i: int, n_samples: int = 1000):
     # Step 1: Compute Integral Region
     i_region = d.detector_cell_from_index(i)
-
-    phi_min, phi_max = i_region.x_range()
-    z_min, z_max = i_region.y_range()
 
     # Debug Integration region
     # fig, ax = detector_plot(d.dim_height_cm)
@@ -134,27 +139,24 @@ def marginal_probability(d: CylinderDetector, x: np.ndarray, i: int, n_samples: 
     # ax.set_title('Integration regions')
     # plt.show()
 
-    # Estimate integral function
-    samples = []
-    for _ in range(n_samples):
-        point = np.array([
-            np.random.uniform(phi_min, phi_max),
-            np.random.uniform(z_min, z_max)
-        ])
+    # Step 2: Compute both terms (integration)
+    R = d.dim_radius_cm
 
-        samp_phi, samp_z = point
+    def integrand(phi, z):
+        frac = np.square(z - x[2])
+        frac /= np.square(x[0] - R * np.cos(phi)) + np.square(x[1] - R * np.sin(phi)) + np.square(z - x[2])
+        return 1 / (2 * np.pi) * np.sqrt(1 - frac)
 
-        # Evaluate Integral
-        R = d.dim_radius_cm
-        frac = np.square(samp_z-x[2])
-        frac /= np.square(x[0]-R*np.cos(samp_phi)) + np.square(x[1]-R*np.sin(samp_phi)) + np.square(samp_z-x[2])
-        samples += [1/(2*np.pi) * np.sqrt(1-frac)]
+    def rejection_func(phi, z):
+        return not (0.0 <= z_2(R=R, X=x, phi_1=phi, z_1=z) <= d.dim_height_cm)
 
-    # Final Monte Carlo Estimate
-    v = (phi_max - phi_min)*(z_max-z_min)
-
-    first_term = v * 1/len(samples) * sum(samples) if len(samples) > 0 else 0.0
     second_term = joint_probability(d, x, i, i, n_samples)
+    first_term = monte_carlo_2d_integral(x_sample_range=i_region.x_range(),
+                                         y_sample_range=i_region.y_range(),
+                                         integrand=integrand,
+                                         rejection_func=rejection_func,
+                                         n_samples=n_samples)
+
     return first_term - second_term
 
 
@@ -164,7 +166,7 @@ if __name__ == '__main__':
     # d.detectors_height = 0.05
 
     p = StaticParticle()
-    p.set_position_cylindrical(r=0.96*d.dim_radius_cm, theta=np.pi, z=d.dim_height_cm/2)
+    p.set_position_cylindrical(r=0.96 * d.dim_radius_cm, theta=np.pi, z=d.dim_height_cm / 2)
     # p.set_position_cylindrical(r=0.0, theta=1.5, z=d.dim_height_cm/2)
 
     n_x, n_y = d.n_detector_cells()
@@ -204,10 +206,12 @@ if __name__ == '__main__':
         print(f'{i}/{n_x}')
         for j in range(n_y):
             x, y = xv[i, j], yv[i, j]
-            idx = x + y*n_x
-            integral_values[i, j] = marginal_probability(d, p.get_position_cartesian(), idx, 100)
+            idx = x + y * n_x
+            integral_values[i, j] = marginal_probability(d, p.get_position_cartesian(), idx, 10)
 
     plt.imshow(integral_values.transpose(), origin='lower')
     plt.title(f'Marginal Probability given {p}')
     plt.colorbar()
     plt.show()
+
+    print(np.sum(integral_values))

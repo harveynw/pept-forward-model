@@ -111,13 +111,13 @@ def barycentric_coords_from_triangle(p: np.ndarray, verts: list):
     return np.array([l_1, l_2, l_3])
 
 
-def inside_quad(x: np.ndarray, quad_points: list) -> bool:
+def inside_quad(x: Numbers, quad_points: list) -> bool:
     # x inside quadrilateral test,
     # quad_points must be clockwise or counter-clockwise
     p1, p2, p3, p4 = quad_points
 
-    b_1 = barycentric_coords_from_triangle(p=x, verts=[p1, p2, p3])
-    b_2 = barycentric_coords_from_triangle(p=x, verts=[p3, p4, p1])
+    b_1 = barycentric_coords_from_triangle(p=np.array(x), verts=[p1, p2, p3])
+    b_2 = barycentric_coords_from_triangle(p=np.array(x), verts=[p3, p4, p1])
 
     return np.all(((b_1 >= 0) & (b_1 <= 1)) | ((b_2 >= 0) & (b_2 <= 1)))
 
