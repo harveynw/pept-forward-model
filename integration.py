@@ -2,6 +2,7 @@ from typing import Callable
 
 import numpy as np
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 from geometry import Quadrilateral
 from model import Detector, CylinderDetector, StaticParticle
@@ -202,15 +203,16 @@ if __name__ == '__main__':
     #
     integral_values = np.zeros((n_x, n_y))
     xv, yv = np.meshgrid(range(n_x), range(n_y), indexing='ij')
-    for i in range(n_x):
-        print(f'{i}/{n_x}')
+    for i in tqdm(range(n_x)):
         for j in range(n_y):
             x, y = xv[i, j], yv[i, j]
             idx = x + y * n_x
             integral_values[i, j] = marginal_probability(d, p.get_position_cartesian(), idx, 10)
 
     plt.imshow(integral_values.transpose(), origin='lower')
-    plt.title(f'Marginal Probability given {p}')
+    plt.title(fr'MC Estimate of Marginal Probability for particle at {p.to_str_cylindrical(latex=True)}')
+    plt.xlabel('Horizontal')
+    plt.ylabel('Vertical')
     plt.colorbar()
     plt.show()
 

@@ -35,7 +35,18 @@ class Point:
         return np.array([self.x, self.y, self.z])
 
     def __str__(self):
+        return self.to_str_cartesian()
+
+    def to_str_cartesian(self):
         return f'Point({self.x}, {self.y}, {self.z})'
+
+    def to_str_cylindrical(self, latex=False):
+        rho = np.linalg.norm([self.x, self.y])
+        theta = azimuth_of_point(self.x, self.y)/np.pi
+        if latex:
+            return fr'Point($\rho={rho:.2f}$, $\theta={theta:.2f}\pi$, $z={self.z:.2f}$)'
+        else:
+            return f'Point(r={rho:.2f}, theta={theta:.2f}pi, z={self.z:.2f})'
 
 
 @dataclass
@@ -90,13 +101,16 @@ class Quadrilateral:
 
 def azimuth_of_point(x: float, y: float):
     # Returns the azimuthal angle of a 2D cartesian point in the range [0, 2π]
-    if np.isclose(x, 0.0):
-        phi = np.pi / 2.0 if y > 0.0 else -np.pi / 2.0
-    elif x > 0.0:
-        phi = np.arctan(y / x)
-    else:
-        phi = np.arctan(y / x) + (np.pi if y >= 0.0 else -np.pi)
-    return np.mod(phi, 2 * np.pi)
+    # if np.isclose(x, 0.0):
+    #     phi = np.pi / 2.0 if y > 0.0 else -np.pi / 2.0
+    # elif x > 0.0:
+    #     phi = np.arctan(y / x)
+    # else:
+    #     phi = np.arctan(y / x) + (np.pi if y >= 0.0 else -np.pi)
+    # return np.mod(phi, 2 * np.pi)
+    # Returns argument of the complex number x+y*i in the range [0, 2pi]
+    angle = np.arctan2(y, x)
+    return angle if angle > 0.0 else 2 * np.pi + angle
 
 
 def barycentric_coords_from_triangle(p: np.ndarray, verts: list):

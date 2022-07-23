@@ -126,8 +126,8 @@ for lor in lors:
         i, j = d5.detector_cell_from_impact(impact=impact)
         cells_hit_counts[i, j] += 1
 
-plt.imshow(cells_hit_counts.transpose())
-plt.title(f'Detector Hit Count for particle at {p5}')
+plt.imshow(cells_hit_counts.transpose(), origin='lower')
+plt.title(fr'Forward-Model Hit Count for particle at {p5.to_str_cylindrical(latex=True)}')
 plt.suptitle(f'Scattering rate for individual photons is {scatter_rate:.00%}')
 plt.xlabel('Horizontal')
 plt.ylabel('Vertical')
