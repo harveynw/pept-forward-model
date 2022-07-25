@@ -128,9 +128,10 @@ for lor in lors:
 
 plt.imshow(cells_hit_counts.transpose(), origin='lower')
 plt.title(fr'Forward-Model Hit Count for particle at {p5.to_str_cylindrical(latex=True)}')
-plt.suptitle(f'Scattering rate for individual photons is {scatter_rate:.00%}')
+# plt.suptitle(f'Scattering rate for individual photons is {scatter_rate:.00%}')
 plt.xlabel('Horizontal')
 plt.ylabel('Vertical')
+plt.savefig('figures/detector_hit_count_forward_model.eps', format='eps', bbox_inches='tight')
 plt.show()
 
 # Plot 6: Detector cell analysis in another way

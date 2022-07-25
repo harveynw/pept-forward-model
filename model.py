@@ -80,16 +80,35 @@ class CylinderDetector(Detector):
 
         return Quadrilateral.from_range([x*d_x, (x+1)*d_x], [y*d_y, (y+1)*d_y])
 
+    def detector_cells_from_region(self, phi_range: tuple, z_range: tuple):
+        # Cells indices that touch a given rectangular region
+        phi_min, phi_max = phi_range
+        z_min, z_max = z_range
+
+        n_x, n_y = self.n_detector_cells()
+        d_phi, d_z = 2*np.pi/n_x, self.dim_height_cm/n_y
+
+        # Range of values by index along dimension
+        phi_coords = (np.floor(phi_min/d_phi).astype(int), np.ceil(phi_max/d_phi).astype(int))
+        z_coords = (np.floor(z_min/d_z).astype(int), np.ceil(z_max/d_z).astype(int))
+
+        # Ensure on detector
+        phi_coords = np.clip(np.array(phi_coords), 0, n_x - 1)
+        z_coords = np.clip(np.array(z_coords), 0, n_y - 1)
+
+        cells = []
+        for i in range(phi_coords[0], phi_coords[1]+1):
+            for j in range(z_coords[0], z_coords[1]+1):
+                cells += [i + n_x * j]
+
+        return cells
+
     def debug_plot(self, ax: plt.axis):
         # Plots the cylinder detector
 
         diameter = 2 * np.pi * self.dim_radius_cm
         n_detectors_horizontal = int(diameter / self.detectors_width)
         n_detectors_vertical = int(self.dim_height_cm / self.detectors_height)
-        print('Detectors:', n_detectors_horizontal, n_detectors_vertical, n_detectors_horizontal * n_detectors_vertical)
-
-        # Rough approximation:
-        # n_detectors_horizontal, n_detectors_vertical = 10, 10
 
         theta_grid, z_grid = np.meshgrid(np.linspace(0, 2 * np.pi, n_detectors_horizontal),
                                          np.linspace(0, self.dim_height_cm, n_detectors_vertical))

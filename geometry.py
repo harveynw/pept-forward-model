@@ -2,7 +2,7 @@ import numpy as np
 import shapely.geometry as sg
 
 from dataclasses import dataclass
-from typing import Union
+from typing import Union, List
 from matplotlib.patches import Polygon
 
 Numbers = Union[np.ndarray, tuple, list]
@@ -47,6 +47,33 @@ class Point:
             return fr'Point($\rho={rho:.2f}$, $\theta={theta:.2f}\pi$, $z={self.z:.2f}$)'
         else:
             return f'Point(r={rho:.2f}, theta={theta:.2f}pi, z={self.z:.2f})'
+
+
+@dataclass
+class MultiQuadrilateral:
+    quads: List
+
+    def plot(self, ax, colour='r'):
+        for q in self.quads:
+            v = q.vertices()
+            poly = Polygon(v + [v[0]], facecolor=colour)
+            ax.add_patch(poly)
+
+    def inside(self, p: Numbers) -> bool:
+        for q in self.quads:
+            if not inside_quad(p, q.vertices()):
+                return False
+        return True
+
+    def intersects(self, quad) -> bool:
+        for q in self.quads:
+            p1 = sg.Polygon(q.vertices())
+            p2 = sg.Polygon(quad.vertices())
+
+            if not p2.intersects(p1):
+                return False
+
+        return True
 
 
 @dataclass

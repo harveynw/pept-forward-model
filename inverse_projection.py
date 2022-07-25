@@ -3,7 +3,10 @@ import streamlit as st
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 
+from geometry import MultiQuadrilateral
+from integration import projection_region
 from model import CylinderDetector, StaticParticle
+from plot import detector_plot
 
 
 def atan2(x1, x2):
@@ -13,42 +16,53 @@ def atan2(x1, x2):
 
 
 def phi_2(R: float, X: np.ndarray, phi_1: float):
-    x, y, _ = X
-    phi = atan2(R*np.sin(phi_1)-y, R*np.cos(phi_1)-x)
+    a_1 = R * np.cos(phi_1)
+    a_2 = R * np.sin(phi_1)
 
-    mu_2_const = x*np.cos(phi) + y*np.sin(phi)
-    mu_2 = -(mu_2_const)
-    mu_2 -= np.sqrt(np.square((mu_2_const)) - (np.square(x) + np.square(y) - np.square(R)))
+    b_1 = X[0] - a_1
+    b_2 = X[1] - a_2
 
-    return atan2(y+mu_2*np.cos(phi), x + mu_2*np.sin(phi))
+    sols = np.roots([
+        b_1 ** 2 + b_2 ** 2,
+        2 * (a_1 * b_1 + a_2 * b_2),
+        a_1 ** 2 + a_2 ** 2 - R ** 2
+    ])
+    sols.sort()
+    mu = sols[1]  # Has to be the positive root
+    return atan2(a_2 + mu * b_2, a_1 + mu * b_1)
 
 
 def z_2(R: float, X: np.ndarray, phi_1: float, z_1: float):
-    x, y, z = X
-    phi = atan2(R*np.sin(phi_1)-y, R*np.cos(phi_1)-x)
+    a_1 = R * np.cos(phi_1)
+    a_2 = R * np.sin(phi_1)
 
-    l_1 = np.linalg.norm(X - np.array([R*np.cos(phi_1), R*np.sin(phi_1), z_1]))
-    theta = np.arccos((z_1-z)/l_1)
+    b_1 = X[0] - a_1
+    b_2 = X[1] - a_2
 
-    l_solved = np.roots([
-        np.square(np.sin(theta)),
-        2*np.sin(theta)*(x*np.cos(phi)+y*np.sin(phi)),
-        np.square(x)+np.square(y)-np.square(R)
+    sols = np.roots([
+        b_1 ** 2 + b_2 ** 2,
+        2 * (a_1 * b_1 + a_2 * b_2),
+        a_1 ** 2 + a_2 ** 2 - R ** 2
     ])
-    l_solved.sort()
-    l_2, l_1_check = l_solved
-
-    return z + l_2*np.cos(theta)
+    sols.sort()
+    mu = sols[1]  # Has to be the positive root
+    return z_1 + mu * (X[2] - z_1)
 
 
 d = CylinderDetector()
 R = d.dim_radius_cm
 
-detector_d_phi = 5*2*np.pi * 1/(2*np.pi*d.dim_radius_cm/d.detectors_width)
-detector_d_z = 5*d.detectors_height
 
-phi_1_range = (np.pi/6, np.pi/6+detector_d_phi)
-z_1_range = (detector_d_z * 3, detector_d_z * 4)
+# detector_d_phi = 5*2*np.pi * 1/(2*np.pi*d.dim_radius_cm/d.detectors_width)
+# detector_d_z = 5*d.detectors_height
+# phi_1_range = (np.pi/6, np.pi/6+detector_d_phi)
+# z_1_range = (detector_d_z * 3, detector_d_z * 4)
+
+n_x, n_y = d.n_detector_cells()
+region = d.detector_cell_from_index(int(n_x/2 + n_y/2 * n_x))
+
+phi_1_range = region.x_range()
+z_1_range = region.y_range()
 
 particle = StaticParticle()
 p_r = st.slider('R', min_value=0.0, max_value=d.dim_radius_cm, value=0.21)
@@ -77,18 +91,7 @@ for _ in range(samples):
 
 x_plot, y_plot = zip(*(hit_samples+proj_samples))
 
-# plt.hist2d(x_plot, y_plot, (5*314, 5*100), cmap=plt.cm.jet,
-#            range=np.array([(0, 2*np.pi), (0, d.dim_height_cm)]))
-# plt.title('Detector Hit Count')
-# plt.xlabel('Horizontal')
-# plt.ylabel('Vertical')
-# plt.xlim((0, 2*np.pi))
-# plt.ylim((0, d.dim_height_cm))
-# plt.show()
-
 fig, ax = plt.subplots()
-# ax.hist2d(x_plot, y_plot, (5*314, 5*100), cmap=plt.cm.jet,
-#            range=np.array([(0, 2*np.pi), (0, d.dim_height_cm)]))
 ax.scatter(x_plot, y_plot, marker='o', s=(72./fig.dpi)**2)
 ax.set_title('Monte Carlo Back-Projection')
 ax.set_xlabel(r"$\phi$")
@@ -100,31 +103,12 @@ st.pyplot(fig)
 
 # Exact Plot
 
-points = ([
-    [phi_1_range[0], z_1_range[0]],
-    [phi_1_range[0], z_1_range[1]],
-    [phi_1_range[1], z_1_range[1]],
-    [phi_1_range[1], z_1_range[0]]
-])
-points += [points[0]]
+i_proj_region = projection_region(R=R, x=particle.get_position_cartesian(), detector_phi=phi_1_range, detector_z=z_1_range)
 
-proj_points = [[phi_2(R, p, po[0]), z_2(R, p, po[0], po[1])] for po in points]
-proj_points += [proj_points[0]]
-
-p1 = Polygon(points, facecolor='r')
-p2 = Polygon(proj_points, facecolor='b')
-
-fig, ax = plt.subplots()
+fig, ax = detector_plot(d.dim_height_cm)
 
 ax.set_title("Quadrilateral Approximation")
-
-ax.add_patch(p1)
-ax.add_patch(p2)
-
-ax.set_xlim([0, 2*np.pi])
-ax.set_ylim([0, d.dim_height_cm])
-
-ax.set_xlabel(r"$\phi$")
-ax.set_ylabel(r"$z$")
+region.plot(ax, 'g')
+i_proj_region.plot(ax, 'r')
 
 st.pyplot(fig)
