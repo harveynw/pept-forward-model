@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from geometry import azimuth_of_point
+from geometry import atan2
 from model import StaticParticle, CylinderDetector, Detector
 from joblib import Parallel, delayed
 
@@ -139,7 +139,7 @@ x_plot, y_plot = [], []
 for lor in lors:
     for impact in lor:
         x, y, z = impact
-        x_plot.append(azimuth_of_point(x, y))
+        x_plot.append(atan2(x, y))
         y_plot.append(z)
 
 plt.hist2d(x_plot, y_plot, (314, 100), cmap=plt.cm.jet)

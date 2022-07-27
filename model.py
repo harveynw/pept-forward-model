@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 from dataclasses import dataclass
 from plot import point_3d, line_3d, arrow_3d
-from geometry import azimuth_of_point, Point, Quadrilateral
+from geometry import atan2, Point, Quadrilateral
 
 
 class Detector:
@@ -62,7 +62,7 @@ class CylinderDetector(Detector):
     def detector_cell_from_impact(self, impact: np.ndarray) -> (int, int):
         # Impact MUST lie on detector, otherwise this function is undefined
         x, y, z = impact
-        phi = azimuth_of_point(x, y)
+        phi = atan2(x, y)
 
         n_horizontal, n_vertical = self.n_detector_cells()
 

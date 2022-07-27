@@ -3,7 +3,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from geometry import azimuth_of_point
+from geometry import atan2
 from plot import points_3d, arrow_3d
 
 vecs, opposite_vecs = [], []
@@ -91,7 +91,7 @@ plt.show()
 
 samples = vecs + opposite_vecs
 sample_theta = [np.arccos(p[2]) for p in samples]
-sample_phi = [azimuth_of_point(p[0], p[1]) for p in samples]
+sample_phi = [atan2(p[0], p[1]) for p in samples]
 
 fig = plt.figure(figsize=(10, 5))
 plt.hist2d(x=sample_phi, y=sample_theta, bins=100)
