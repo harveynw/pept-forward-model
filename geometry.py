@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Union, List
 from matplotlib.patches import Polygon
 
-Numbers = Union[np.ndarray, tuple, list]
+Coordinate = Union[np.ndarray, tuple, list]
 
 
 # Base class for representing a point in space, supports some useful representations
@@ -59,7 +59,7 @@ class MultiQuadrilateral:
             poly = Polygon(v + [v[0]], facecolor=colour)
             ax.add_patch(poly)
 
-    def inside(self, p: Numbers) -> bool:
+    def inside(self, p: Coordinate) -> bool:
         for q in self.quads:
             if not inside_quad(p, q.vertices()):
                 return False
@@ -78,13 +78,13 @@ class MultiQuadrilateral:
 
 @dataclass
 class Quadrilateral:
-    v1: Numbers
-    v2: Numbers
-    v3: Numbers
-    v4: Numbers
+    v1: Coordinate
+    v2: Coordinate
+    v3: Coordinate
+    v4: Coordinate
 
     @classmethod
-    def from_range(cls, x_range: Numbers, y_range: Numbers):
+    def from_range(cls, x_range: Coordinate, y_range: Coordinate):
         return cls([x_range[0], y_range[0]],
                    [x_range[0], y_range[1]],
                    [x_range[1], y_range[1]],
@@ -95,7 +95,7 @@ class Quadrilateral:
         poly = Polygon(v + [v[0]], facecolor=colour)
         ax.add_patch(poly)
 
-    def inside(self, p: Numbers) -> bool:
+    def inside(self, p: Coordinate) -> bool:
         return inside_quad(p, self.vertices())
 
     def intersects(self, quad) -> bool:
@@ -126,16 +126,18 @@ class Quadrilateral:
         return [self.v1, self.v2, self.v3, self.v4]
 
 
+class RectangleQuadrilateral(Quadrilateral):
+    def __init__(self, min_point: Coordinate, max_point: Coordinate):
+        super().__init__(
+            [min_point[0], min_point[1]],
+            [min_point[0], max_point[1]],
+            [max_point[0], max_point[1]],
+            [max_point[0], min_point[1]]
+        )
+
+
 def azimuth_of_point(x: float, y: float):
     # Returns the azimuthal angle of a 2D cartesian point in the range [0, 2π]
-    # if np.isclose(x, 0.0):
-    #     phi = np.pi / 2.0 if y > 0.0 else -np.pi / 2.0
-    # elif x > 0.0:
-    #     phi = np.arctan(y / x)
-    # else:
-    #     phi = np.arctan(y / x) + (np.pi if y >= 0.0 else -np.pi)
-    # return np.mod(phi, 2 * np.pi)
-    # Returns argument of the complex number x+y*i in the range [0, 2pi]
     angle = np.arctan2(y, x)
     return angle if angle > 0.0 else 2 * np.pi + angle
 
@@ -152,7 +154,7 @@ def barycentric_coords_from_triangle(p: np.ndarray, verts: list):
     return np.array([l_1, l_2, l_3])
 
 
-def inside_quad(x: Numbers, quad_points: list) -> bool:
+def inside_quad(x: Coordinate, quad_points: list) -> bool:
     # x inside quadrilateral test,
     # quad_points must be clockwise or counter-clockwise
     p1, p2, p3, p4 = quad_points
