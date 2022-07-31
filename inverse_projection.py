@@ -2,41 +2,13 @@ import numpy as np
 import streamlit as st
 import matplotlib.pyplot as plt
 
+from geometry import phi_proj, z_proj
 from integration import projection_region
 from model import CylinderDetector, StaticParticle
 from plot import detector_plot
 
-
-def atan2(x1, x2):
-    # Returns argument of the complex number x2+x1*i in the range [0, 2pi]
-    angle = np.arctan2(x1, x2)
-    return angle if angle > 0.0 else 2*np.pi + angle
-
-
-def phi_2(R: float, X: np.ndarray, phi_1: float) -> float:
-    s, c = np.sin(phi_1), np.cos(phi_1)
-    c_1, c_2 = X[0] - R*c, X[1] - R*s
-    omega = -2*R*(c * c_1 + s * c_2)/(np.square(c_1) + np.square(c_2))
-
-    return atan2(R*s + omega*c_2, R*c + omega*c_1)
-
-
-def z_2(R: float, X: np.ndarray, phi_1: float, z_1: float) -> float:
-    s, c = np.sin(phi_1), np.cos(phi_1)
-    c_1, c_2 = X[0] - R*c, X[1] - R*s
-    omega = -2*R*(c * c_1 + s * c_2)/(np.square(c_1) + np.square(c_2))
-
-    return z_1 + omega*(X[2]-z_1)
-
-
 d = CylinderDetector()
 R = d.dim_radius_cm
-
-
-# detector_d_phi = 5*2*np.pi * 1/(2*np.pi*d.dim_radius_cm/d.detectors_width)
-# detector_d_z = 5*d.detectors_height
-# phi_1_range = (np.pi/6, np.pi/6+detector_d_phi)
-# z_1_range = (detector_d_z * 3, detector_d_z * 4)
 
 n_x, n_y = d.n_detector_cells()
 region = d.detector_cell_from_index(int(n_x/4 + n_y/2 * n_x))
@@ -44,12 +16,13 @@ region = d.detector_cell_from_index(int(n_x/4 + n_y/2 * n_x))
 phi_1_range = region.x_range()
 z_1_range = region.y_range()
 
+st.title('Projecting detector surface through particle')
+
 particle = StaticParticle()
 p_r = st.slider('R', min_value=0.0, max_value=d.dim_radius_cm, value=0.21)
 p_theta = st.slider('theta', min_value=0.0, max_value=2*np.pi, value=0.32)
 p_z = st.slider('z', min_value=0.0, max_value=d.dim_height_cm, value=0.11)
 samples = st.number_input('samples', min_value=1, max_value=10**9, value=10000)
-use_improved = st.checkbox('Use Formulas from Paper')
 
 particle.set_position_cylindrical(r=p_r, theta=p_theta, z=p_z)
 p = particle.get_position_cartesian()
@@ -64,12 +37,8 @@ for _ in range(samples):
 
     hit_samples += [(phi_1_sample, z_1_sample)]
 
-    if use_improved:
-        phi_2_sample = phi_2_report(R, p, phi_1_sample)
-        z_2_sample = z_2_report(R, p, phi_1_sample, z_1_sample)
-    else:
-        phi_2_sample = phi_2(R, p, phi_1_sample)
-        z_2_sample = z_2(R, p, phi_1_sample, z_1_sample)
+    phi_2_sample = phi_proj(R, p, phi_1_sample)
+    z_2_sample = z_proj(R, p, phi_1_sample, z_1_sample)
 
     if 0.0 < z_2_sample < d.dim_height_cm:
         proj_samples += [(phi_2_sample, z_2_sample)]
@@ -83,7 +52,7 @@ if proj_samples:
     x_plot, y_plot = zip(*proj_samples)
     ax.scatter(x_plot, y_plot, marker='o', s=(72./fig.dpi)**2)
 
-ax.set_title('Monte Carlo Back-Projection')
+ax.set_title(f'Monte Carlo Projection (n={samples})')
 ax.set_xlabel(r"$\phi$")
 ax.set_ylabel(r"$z$")
 ax.set_xlim((0, 2*np.pi))

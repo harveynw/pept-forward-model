@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 from dataclasses import dataclass
 from plot import point_3d, line_3d, arrow_3d
-from geometry import atan2, Point, Quadrilateral
+from geometry import atan2, Point, Quadrilateral, RectangleQuadrilateral
 
 
 class Detector:
@@ -78,7 +78,7 @@ class CylinderDetector(Detector):
         y, x = divmod(i, n_x)
         d_x, d_y = 2*np.pi/n_x, self.dim_height_cm/n_y
 
-        return Quadrilateral.from_range([x*d_x, (x+1)*d_x], [y*d_y, (y+1)*d_y])
+        return RectangleQuadrilateral([x*d_x, y*d_y], [(x+1)*d_x, (y+1)*d_y])
 
     def detector_cells_from_region(self, phi_range: tuple, z_range: tuple):
         # Cells indices that touch a given rectangular region

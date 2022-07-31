@@ -175,7 +175,10 @@ def line_segments_intersection(p1: Coordinate, n1: Coordinate, p2: Coordinate, n
         return None  # Not on both line segments
 
 
-def rect_quad_intersection_area(rect: RectangleQuadrilateral, quad: Quadrilateral):
+def rect_quad_intersection_area(rect: RectangleQuadrilateral, quad: Union[Quadrilateral, MultiQuadrilateral]):
+    if isinstance(quad, MultiQuadrilateral):
+        return sum([rect_quad_intersection_area(rect, q) for q in quad.quads])
+
     interior_poly: List[Coordinate] = []
 
     # First test if any vertices of rect are interior points of quad
@@ -240,6 +243,22 @@ def inside_quad(x: Coordinate, quad_points: np.ndarray) -> bool:
     return np.all(((b_1 >= 0) & (b_1 <= 1)) | ((b_2 >= 0) & (b_2 <= 1)))
 
 
+def phi_proj(R: float, X: np.ndarray, phi: float) -> float:
+    s, c = np.sin(phi), np.cos(phi)
+    c_1, c_2 = X[0] - R*c, X[1] - R*s
+    omega = -2*R*(c * c_1 + s * c_2)/(np.square(c_1) + np.square(c_2))
+
+    return atan2(R*s + omega*c_2, R*c + omega*c_1)
+
+
+def z_proj(R: float, X: np.ndarray, phi: float, z: float) -> float:
+    s, c = np.sin(phi), np.cos(phi)
+    c_1, c_2 = X[0] - R*c, X[1] - R*s
+    omega = -2*R*(c * c_1 + s * c_2)/(np.square(c_1) + np.square(c_2))
+
+    return z + omega*(X[2]-z)
+
+
 if __name__ == '__main__':
     # Some testing
 
@@ -256,17 +275,17 @@ if __name__ == '__main__':
 
     # Test: rect_quad_intersection_area
 
-    # a1, a2, a3, a4 = [0.1, 0.1], [0.1, 0.9], [0.9, 0.9], [0.9, 0.1]
-    # quad = Quadrilateral(a1, a2, a3, a4)
-    # rect = RectangleQuadrilateral([0, 0], [1, 1])
-    #
-    # print(rect_quad_intersection_area(rect, quad))
-    #
-    # import matplotlib.pyplot as plt
-    # fig, ax = plt.subplots()
-    # rect.plot(ax, 'g')
-    # quad.plot(ax, 'r')
-    # ax.set_xlim([-2, 2]), ax.set_ylim([-2, 2])
-    # plt.show()
+    a1, a2, a3, a4 = [1, 1], [1, 2], [2, 2], [2, 1]
+    quad = Quadrilateral(a1, a2, a3, a4)
+    rect = RectangleQuadrilateral([0, 0], [1, 1])
+
+    print(rect_quad_intersection_area(rect, quad))
+
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots()
+    rect.plot(ax, 'g')
+    quad.plot(ax, 'r')
+    ax.set_xlim([-2, 2]), ax.set_ylim([-2, 2])
+    plt.show()
 
     exit()
