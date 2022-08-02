@@ -1,15 +1,17 @@
-from typing import List
-
+import random
 import numpy as onp
 import jax.numpy as jnp
-from jax import grad, jit, vmap
-from jax import random
-
 import matplotlib.pyplot as plt
+
+from typing import List
+from jax import grad, jit, vmap
 from matplotlib import patches
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
 from model import CylinderDetector
+
+
+# Detectors are defined throughout as array([min_phi, min_z, d_phi, d_z])
+# where they occupy [min_phi, min_phi + d_phi] x [min_z, min_z + d_z]
 
 
 def atan2(y, x):
@@ -58,22 +60,22 @@ def G_z(R, phi_1, z_1, x, y, z):
 
 def G_varphi_theta(R, phi_1, z_1, x, y, z):
     p = jnp.array([x, y, z])
-    incident = jnp.array([R*jnp.cos(phi_1), R*jnp.sin(phi_1), z_1])
-    diff = p - incident
+    incident = jnp.array([R * jnp.cos(phi_1), R * jnp.sin(phi_1), z_1])
+    diff = incident - p
     l_1 = jnp.sqrt(jnp.dot(diff, diff))
 
     varphi = atan2(diff[1], diff[0])
-    theta = jnp.arccos((z_1 - z)/l_1)
+    theta = jnp.arccos((z_1 - z) / l_1)
 
     return varphi, theta
 
 
 def jacobian_phi_1(R, varphi, x, y):
-    return jnp.abs(grad(F_phi_1, 1)(R, varphi, x, y))
+    return 1.0 / jnp.abs(grad(F_phi_1, 1)(R, varphi, x, y))
 
 
 def jacobian_z_1(R, varphi, theta, x, y, z):
-    return jnp.abs(grad(F_z_1, 2)(R, varphi, theta, x, y, z))
+    return 1.0 / jnp.abs(grad(F_z_1, 2)(R, varphi, theta, x, y, z))
 
 
 def greater_than(x, threshold, gamma):
@@ -96,21 +98,23 @@ def detector_proj(R, min_phi, max_phi, min_z, max_z, x, y, z):
            G_z(R, min_phi, min_z, x, y, z), G_z(R, min_phi, max_z, x, y, z)
 
 
-def characteristic_function(R, min_phi, max_phi, min_z, max_z, phi_1, z_1, x, y, z):
-    gamma = 5
+def characteristic_function(R, detector_j, phi_1, z_1, x, y, z):
+    gamma = 500
+
+    j_phi_min, j_z_min, d_phi, d_z = detector_j
 
     phi_2, z_2 = G_phi(R, phi_1, x, y), G_z(R, phi_1, z_1, x, y, z)
 
-    cond_1 = greater_than(phi_2, min_phi, gamma)
-    cond_2 = smaller_than(phi_2, max_phi, gamma)
-    cond_3 = greater_than(z_2, min_z, gamma)
-    cond_4 = smaller_than(z_2, max_z, gamma)
+    cond_1 = greater_than(phi_2, j_phi_min, gamma)
+    cond_2 = smaller_than(phi_2, j_phi_min + d_phi, gamma)
+    cond_3 = greater_than(z_2, j_z_min, gamma)
+    cond_4 = smaller_than(z_2, j_z_min + d_z, gamma)
 
     return cond_1 * cond_2 * cond_3 * cond_4
 
 
-def projected_inside_detector(R, min_phi, max_phi, min_z, max_z, phi_1, z_1, x, y, z):
-    return characteristic_function(R, min_phi, max_phi, min_z, max_z, phi_1, z_1, x, y, z)
+def projected_inside_detector(R, detector_j, phi_1, z_1, x, y, z):
+    return characteristic_function(R, detector_j, phi_1, z_1, x, y, z)
 
 
 # def inside_projected_detector(R, min_phi, max_phi, min_z, max_z, phi_2, z_2, x, y, z):
@@ -136,16 +140,14 @@ def projected_inside_detector(R, min_phi, max_phi, min_z, max_z, phi_1, z_1, x, 
 #     return bound  # in [0,1]
 
 
-def evaluate_integrand(R, detector_i: tuple, detector_j: tuple, x, y, z):
-    i_phi_min, i_phi_max, i_z_min, i_z_max = detector_i
-    j_phi_min, j_phi_max, j_z_min, j_z_max = detector_j
+def evaluate_integrand(R, detector_i, detector_j, x, y, z):
+    i_phi_min, i_z_min, d_phi, d_z = detector_i
 
-    centroid_phi = (i_phi_max - i_phi_min) / 2.0
-    centroid_z = (i_z_max - i_z_min) / 2.0
+    centroid_phi = i_phi_min + d_phi / 2.0
+    centroid_z = i_z_min + d_z / 2.0
 
     # Characteristic
-    char = characteristic_function(R=R, min_phi=j_phi_min, max_phi=j_phi_max,
-                                   min_z=j_z_min, max_z=j_z_max, phi_1=centroid_phi, z_1=centroid_z,
+    char = characteristic_function(R=R, detector_j=detector_j, phi_1=centroid_phi, z_1=centroid_z,
                                    x=x, y=y, z=z)
 
     # Other parts of integrand
@@ -157,23 +159,25 @@ def evaluate_integrand(R, detector_i: tuple, detector_j: tuple, x, y, z):
 
 
 def compute_joint_probability(R, detector_i: tuple, detector_j: tuple, x, y, z):
-    i_phi_min, i_phi_max, i_z_min, i_z_max = detector_i
+    i_phi_min, i_z_min, d_phi, d_z = detector_i
 
     # Integral estimate = Volume * integrand(centroid)
-    V = (i_phi_max - i_phi_min) * (i_z_max - i_z_min)
+    V = d_phi * d_z
 
     return V * evaluate_integrand(R=R, detector_i=detector_i, detector_j=detector_j,
                                   x=x, y=y, z=z)
 
 
-def compute_marginal_probability(R, detector_i: tuple, detectors: List[tuple], x, y, z):
-    term_1 = 0.0
-    for d in detectors:
-        term_1 += compute_joint_probability(R, detector_i, d, x, y, z)
-    term_1 = 2 * term_1
+def compute_marginal_probability(R, detector_i: jnp.array, detectors: jnp.array, x, y, z):
+    joint = jit(compute_joint_probability)
+    joint_vmapped = jit(vmap(compute_joint_probability,
+                             in_axes=(None, None, 0, None, None, None), out_axes=0))
 
-    term_2 = compute_joint_probability(R, detector_i, detector_i, x, y, z)
-    return term_1 - term_2
+    # term_1 = 2 * jnp.sum(joint_vmapped(R, detector_i, detectors, x, y, z))
+    # term_2 = joint(R, detector_i, detector_i, x, y, z)
+    # return term_1 - term_2
+
+    return jnp.sum(joint_vmapped(R, detector_i, detectors, x, y, z))
 
 
 def plot_proj_area(min_phi=jnp.pi / 2 - 0.05, max_phi=jnp.pi / 2 + 0.05, min_z=0.20, max_z=0.30, x=0.0, y=0.0, z=0.25):
@@ -219,33 +223,26 @@ def plot_proj_area(min_phi=jnp.pi / 2 - 0.05, max_phi=jnp.pi / 2 + 0.05, min_z=0
     return fig, ax
 
 
-def plot_marginal(d: CylinderDetector, x, y, z):
-    R = d.dim_radius_cm
-    jitted_eval = jit(evaluate_integrand)
-    # evaluate_integrand(R, i_phi_min, i_phi_max, i_z_min, i_z_max,
-    #                    j_phi_min, j_phi_max, j_z_min, j_z_max,
-    #                    x, y, z)
+def plot_marginal(x=0.0, y=0.0, z=0.25):
+    d = CylinderDetector()
+
+    n_phi, n_z = d.n_detector_cells()
+    n = n_phi * n_z
+    d_phi, d_z = 2.0 * onp.pi / n_phi, d.dim_height_cm / n_z
+
+    detector_quads = [d.detector_cell_from_index(idx) for idx in range(n)]
+    detectors = jnp.array([list(quad.min()) + [d_phi, d_z] for quad in detector_quads])
+
+    marginal_mapped = jit(vmap(compute_marginal_probability, in_axes=(None, 0, None, None, None, None), out_axes=0))
+
+    vals = marginal_mapped(d.dim_radius_cm, detectors, detectors, x, y, z)
+    img = onp.array(vals).reshape((n_z, n_phi))
 
     fig, ax = plt.subplots()
-    n_x, n_y = d.n_detector_cells()
-    img = onp.zeros((n_x, n_y))
-
-    detector_cells = []
-
-    for i in range(n_x):
-        for j in range(n_y):
-            idx = i + j * n_x
-            centre_phi, centre_z = d.detector_cell_from_index(idx).vertices().mean(axis=0)
-            v = jitted_eval(R, centre_phi, centre_z, x, y, z)
-            img[i, j] = v
-
-    plt_im = ax.imshow(img.transpose(), origin='lower')
-
-    # Plot original detector
-    ax.set_xlabel(r'Horizontal $\phi_2 \in [0, 2\pi]$')
-    ax.set_ylabel(r'Vertical $z_2 \in [0, 0.5]$')
+    plt_im = ax.imshow(img, origin='lower')
+    ax.set_xlabel(r'Horizontal $\phi \in [0, 2\pi]$')
+    ax.set_ylabel(r'Vertical $z \in [0, 0.5]$')
     ax.set_title(r'Marginal Distribution')
-
     divider = make_axes_locatable(ax)
     cax = divider.append_axes('right', size='5%', pad=0.05)
     fig.colorbar(plt_im, cax=cax, orientation='vertical')
@@ -268,11 +265,24 @@ if __name__ == '__main__':
     # plot_proj_area(jnp.pi/4, jnp.pi/4 + jnp.pi/10, min_z=0.1, max_z=0.2, x=0.1, y=0.05)
     # plt.show()
 
-    d = CylinderDetector()
-    n_x, n_y = d.n_detector_cells()
-    n = n_x * n_y
-    detectors = [d.detector_cell_from_index(idx) for idx in range(n)]
-    detectors_boundaries = [cell.x_range() + cell.y_range() for cell in detectors]
+    # d = CylinderDetector()
+    #
+    # n_phi, n_z = d.n_detector_cells()
+    # n = n_phi * n_z
+    # d_phi, d_z = 2.0 * onp.pi / n_phi, d.dim_height_cm / n_z
+    #
+    # detector_quads = [d.detector_cell_from_index(idx) for idx in range(n)]
+    # detectors = jnp.array([list(quad.min()) + [d_phi, d_z] for quad in detector_quads])
+    #
+    # print(compute_marginal_probability(R=d.dim_radius_cm,
+    #                                    detector_i=detectors[random.randint(0, n - 1), :],
+    #                                    detectors=detectors,
+    #                                    x=0.0,
+    #                                    y=0.0,
+    #                                    z=0.25))
 
-    print(detectors_boundaries)
+    plot_marginal()
+    plt.show()
 
+    plot_marginal(0.1, 0.1, 0.25)
+    plt.show()

@@ -62,12 +62,12 @@ class CylinderDetector(Detector):
     def detector_cell_from_impact(self, impact: np.ndarray) -> (int, int):
         # Impact MUST lie on detector, otherwise this function is undefined
         x, y, z = impact
-        phi = atan2(x, y)
+        phi = atan2(y, x)
 
-        n_horizontal, n_vertical = self.n_detector_cells()
+        n_phi, n_z = self.n_detector_cells()
 
-        detector_i = np.floor(phi / (2 * np.pi) * n_horizontal)
-        detector_j = np.floor(z / self.dim_height_cm * n_vertical)
+        detector_i = np.floor(phi / (2 * np.pi) * n_phi)
+        detector_j = np.floor(z / self.dim_height_cm * n_z)
         return int(detector_i), int(detector_j)
 
     def detector_cell_from_index(self, i: int):
