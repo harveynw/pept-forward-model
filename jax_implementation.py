@@ -3,7 +3,6 @@ import numpy as onp
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from typing import List
 from jax import grad, jit, vmap
 from matplotlib import patches
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -165,25 +164,23 @@ def evaluate_integrand(R, detector_i, detector_j, X):
 @jit
 def compute_joint_probability(R, detector_i: tuple, detector_j: tuple, X: jnp.array):
     i_phi_min, i_z_min, d_phi, d_z = detector_i
+    _, j_z_min, _, _ = detector_j
+    _, _, z = X
 
     # Integral estimate = Volume * integrand(centroid)
+    gamma = 5
+    valid_detectors = greater_than(z, j_z_min, gamma) * smaller_than(z, i_z_min + d_z, gamma)
     V = d_phi * d_z
 
-    return V * evaluate_integrand(R=R, detector_i=detector_i, detector_j=detector_j,
-                                  X=X)
+    return valid_detectors * V * evaluate_integrand(R=R, detector_i=detector_i, detector_j=detector_j, X=X)
 
 
 @jit
 def compute_marginal_probability(R, detector_i: jnp.array, detectors: jnp.array, X: jnp.array):
-    joint_vmapped = vmap(compute_joint_probability,
-                         in_axes=(None, None, 0, None), out_axes=0)
+    joint_vmapped_1 = vmap(compute_joint_probability, in_axes=(None, None, 0, None), out_axes=0)
+    joint_vmapped_2 = vmap(compute_joint_probability, in_axes=(None, 0, None, None), out_axes=0)
 
-    # joint = jit(compute_joint_probability)
-    # term_1 = 2 * jnp.sum(joint_vmapped(R, detector_i, detectors, x, y, z))
-    # term_2 = joint(R, detector_i, detector_i, x, y, z)
-    # return term_1 - term_2
-
-    return jnp.sum(joint_vmapped(R, detector_i, detectors, X))
+    return jnp.sum(joint_vmapped_1(R, detector_i, detectors, X)) + jnp.sum(joint_vmapped_2(R, detectors, detector_i, X))
 
 
 def plot_proj_area(min_phi=jnp.pi / 2 - 0.05, max_phi=jnp.pi / 2 + 0.05, min_z=0.20, max_z=0.30, x=0.0, y=0.0, z=0.25):
@@ -229,7 +226,7 @@ def plot_proj_area(min_phi=jnp.pi / 2 - 0.05, max_phi=jnp.pi / 2 + 0.05, min_z=0
     return fig, ax
 
 
-def plot_marginal(X=None):
+def plot_marginal(X = None):
     if X is None:
         X = jnp.array([0.0, 0.0, 0.25])
     else:
