@@ -17,7 +17,7 @@ class Detector:
         pass
 
     @abc.abstractmethod
-    def detector_cell_from_impact(self, impact: np.ndarray) -> (int, int):
+    def detector_index_from_impact(self, impact: np.ndarray) -> (int, int):
         pass
 
 
@@ -59,16 +59,23 @@ class CylinderDetector(Detector):
         n_vertical = np.rint(self.dim_height_cm / self.detectors_height)
         return int(n_horizontal), int(n_vertical)
 
-    def detector_cell_from_impact(self, impact: np.ndarray) -> (int, int):
-        # Impact MUST lie on detector, otherwise this function is undefined
+    def del_detector_cells(self) -> (float, float):
+        n_phi, n_z = self.n_detector_cells()
+        return 2 * np.pi / n_phi, self.dim_height_cm / n_z
+
+    def detector_index_from_impact(self, impact: np.ndarray) -> (int, int):
         x, y, z = impact
         phi = atan2(y, x)
 
-        n_phi, n_z = self.n_detector_cells()
+        # Ensure impact is on detector
+        assert np.isclose(self.dim_radius_cm, np.sqrt(x**2 + y**2)), 'Impact not on detector'
 
-        detector_i = np.floor(phi / (2 * np.pi) * n_phi)
-        detector_j = np.floor(z / self.dim_height_cm * n_z)
-        return int(detector_i), int(detector_j)
+        n_phi, _ = self.n_detector_cells()
+        d_phi, d_z = self.del_detector_cells()
+
+        phi_index, z_index = int(phi // d_phi), int(z // d_z)
+
+        return phi_index + n_phi * z_index
 
     def detector_cell_from_index(self, i: int):
         # Detector cell boundaries in phi, z format
@@ -233,7 +240,15 @@ class StaticParticle(Point):
                     final_impacts.append(self.get_position_cartesian() + l * n)
 
             if was_detected:
-                impacts += [final_impacts]
+                detector_i = detector.detector_index_from_impact(final_impacts[0])
+                detector_j = detector.detector_index_from_impact(final_impacts[1])
+
+                # Return detector indices
+                impacts += [(detector_i, detector_j)]
+
+                # Return cartesian coordinate impacts
+                # impacts += [final_impacts]
+
                 n_scatters += final_scatter_count
 
                 if debug_ax is not None:

@@ -15,7 +15,6 @@ from model import CylinderDetector
 
 
 def atan2(y, x):
-    # return jnp.arctan2(y, x) + jnp.pi
     angle = jnp.arctan2(y, x)
     return jnp.where(angle > 0.0, angle, 2 * jnp.pi + angle)
 
@@ -36,12 +35,14 @@ def F_phi_2(R, varphi, x, y):
     return atan2(y + l_2 * jnp.cos(varphi), x + l_2 * jnp.sin(varphi))
 
 
-def F_z_1(R, varphi, theta, x, y, z):
+def F_z_1(R, varphi, theta, X):
+    x, y, z = X
     l_1, _ = F_lambdas_hat(R, varphi, x, y)
     return z + l_1 * jnp.cos(theta) / jnp.sin(theta)
 
 
-def F_z_2(R, varphi, theta, x, y, z):
+def F_z_2(R, varphi, theta, X):
+    x, y, z = X
     _, l_2 = F_lambdas_hat(R, varphi, x, y)
     return z + l_2 * jnp.cos(theta) / jnp.sin(theta)
 
@@ -52,20 +53,20 @@ def G_phi(R, phi_1, x, y):
     return atan2(R * jnp.sin(phi_1) + omega * c_y, R * jnp.cos(phi_1) + omega * c_x)
 
 
-def G_z(R, phi_1, z_1, x, y, z):
+def G_z(R, phi_1, z_1, X):
+    x, y, z = X
     c_x, c_y = x - R * jnp.cos(phi_1), y - R * jnp.sin(phi_1)
     omega = -2 * R * (jnp.cos(phi_1) * c_x + jnp.sin(phi_1) * c_y) / (c_x ** 2 + c_y ** 2)
     return z_1 + omega * (z - z_1)
 
 
-def G_varphi_theta(R, phi_1, z_1, x, y, z):
-    p = jnp.array([x, y, z])
+def G_varphi_theta(R, phi_1, z_1, X):
     incident = jnp.array([R * jnp.cos(phi_1), R * jnp.sin(phi_1), z_1])
-    diff = incident - p
+    diff = incident - X
     l_1 = jnp.sqrt(jnp.dot(diff, diff))
 
     varphi = atan2(diff[1], diff[0])
-    theta = jnp.arccos((z_1 - z) / l_1)
+    theta = jnp.arccos((z_1 - X[2]) / l_1)
 
     return varphi, theta
 
@@ -74,8 +75,8 @@ def jacobian_phi_1(R, varphi, x, y):
     return 1.0 / jnp.abs(grad(F_phi_1, 1)(R, varphi, x, y))
 
 
-def jacobian_z_1(R, varphi, theta, x, y, z):
-    return 1.0 / jnp.abs(grad(F_z_1, 2)(R, varphi, theta, x, y, z))
+def jacobian_z_1(R, varphi, theta, X):
+    return 1.0 / jnp.abs(grad(F_z_1, 2)(R, varphi, theta, X))
 
 
 def greater_than(x, threshold, gamma):
@@ -86,24 +87,26 @@ def smaller_than(x, threshold, gamma):
     return 0.5 * jnp.tanh(-(x - threshold) * gamma) + 0.5
 
 
-def detector_proj(R, min_phi, max_phi, min_z, max_z, x, y, z):
+def detector_proj(R, min_phi, max_phi, min_z, max_z, X):
     # Clockwise
     # p1 = (G_phi(R, max_phi, x, y), G_z(R, max_phi, max_z, x, y, z))
     # p2 = (G_phi(R, max_phi, x, y), G_z(R, max_phi, min_z, x, y, z))
     # p3 = (G_phi(R, min_phi, x, y), G_z(R, min_phi, min_z, x, y, z))
     # p4 = (G_phi(R, min_phi, x, y), G_z(R, min_phi, max_z, x, y, z))
 
+    x, y, _ = X
     return G_phi(R, max_phi, x, y), G_phi(R, min_phi, x, y), \
-           G_z(R, max_phi, max_z, x, y, z), G_z(R, max_phi, min_z, x, y, z), \
-           G_z(R, min_phi, min_z, x, y, z), G_z(R, min_phi, max_z, x, y, z)
+           G_z(R, max_phi, max_z, X), G_z(R, max_phi, min_z, X), \
+           G_z(R, min_phi, min_z, X), G_z(R, min_phi, max_z, X)
 
 
-def characteristic_function(R, detector_j, phi_1, z_1, x, y, z):
-    gamma = 500
+def characteristic_function(R, detector_j, phi_1, z_1, X):
+    gamma = 500  # 500
 
     j_phi_min, j_z_min, d_phi, d_z = detector_j
 
-    phi_2, z_2 = G_phi(R, phi_1, x, y), G_z(R, phi_1, z_1, x, y, z)
+    x, y, _ = X
+    phi_2, z_2 = G_phi(R, phi_1, x, y), G_z(R, phi_1, z_1, X)
 
     cond_1 = greater_than(phi_2, j_phi_min, gamma)
     cond_2 = smaller_than(phi_2, j_phi_min + d_phi, gamma)
@@ -113,8 +116,8 @@ def characteristic_function(R, detector_j, phi_1, z_1, x, y, z):
     return cond_1 * cond_2 * cond_3 * cond_4
 
 
-def projected_inside_detector(R, detector_j, phi_1, z_1, x, y, z):
-    return characteristic_function(R, detector_j, phi_1, z_1, x, y, z)
+def projected_inside_detector(R, detector_j, phi_1, z_1, X):
+    return characteristic_function(R, detector_j, phi_1, z_1, X)
 
 
 # def inside_projected_detector(R, min_phi, max_phi, min_z, max_z, phi_2, z_2, x, y, z):
@@ -140,7 +143,7 @@ def projected_inside_detector(R, detector_j, phi_1, z_1, x, y, z):
 #     return bound  # in [0,1]
 
 
-def evaluate_integrand(R, detector_i, detector_j, x, y, z):
+def evaluate_integrand(R, detector_i, detector_j, X):
     i_phi_min, i_z_min, d_phi, d_z = detector_i
 
     centroid_phi = i_phi_min + d_phi / 2.0
@@ -148,36 +151,39 @@ def evaluate_integrand(R, detector_i, detector_j, x, y, z):
 
     # Characteristic
     char = characteristic_function(R=R, detector_j=detector_j, phi_1=centroid_phi, z_1=centroid_z,
-                                   x=x, y=y, z=z)
+                                   X=X)
 
     # Other parts of integrand
-    centroid_varphi, centroid_theta = G_varphi_theta(R, centroid_phi, centroid_z, x, y, z)
+    x, y, _ = X
+    centroid_varphi, centroid_theta = G_varphi_theta(R, centroid_phi, centroid_z, X)
     j_1 = jacobian_phi_1(R, centroid_varphi, x, y)
-    j_2 = jacobian_z_1(R, centroid_varphi, centroid_theta, x, y, z)
+    j_2 = jacobian_z_1(R, centroid_varphi, centroid_theta, X)
 
     return (1 / (4 * jnp.pi)) * char * jnp.sin(centroid_theta) * j_1 * j_2
 
 
-def compute_joint_probability(R, detector_i: tuple, detector_j: tuple, x, y, z):
+@jit
+def compute_joint_probability(R, detector_i: tuple, detector_j: tuple, X: jnp.array):
     i_phi_min, i_z_min, d_phi, d_z = detector_i
 
     # Integral estimate = Volume * integrand(centroid)
     V = d_phi * d_z
 
     return V * evaluate_integrand(R=R, detector_i=detector_i, detector_j=detector_j,
-                                  x=x, y=y, z=z)
+                                  X=X)
 
 
-def compute_marginal_probability(R, detector_i: jnp.array, detectors: jnp.array, x, y, z):
-    joint = jit(compute_joint_probability)
-    joint_vmapped = jit(vmap(compute_joint_probability,
-                             in_axes=(None, None, 0, None, None, None), out_axes=0))
+@jit
+def compute_marginal_probability(R, detector_i: jnp.array, detectors: jnp.array, X: jnp.array):
+    joint_vmapped = vmap(compute_joint_probability,
+                         in_axes=(None, None, 0, None), out_axes=0)
 
+    # joint = jit(compute_joint_probability)
     # term_1 = 2 * jnp.sum(joint_vmapped(R, detector_i, detectors, x, y, z))
     # term_2 = joint(R, detector_i, detector_i, x, y, z)
     # return term_1 - term_2
 
-    return jnp.sum(joint_vmapped(R, detector_i, detectors, x, y, z))
+    return jnp.sum(joint_vmapped(R, detector_i, detectors, X))
 
 
 def plot_proj_area(min_phi=jnp.pi / 2 - 0.05, max_phi=jnp.pi / 2 + 0.05, min_z=0.20, max_z=0.30, x=0.0, y=0.0, z=0.25):
@@ -204,7 +210,7 @@ def plot_proj_area(min_phi=jnp.pi / 2 - 0.05, max_phi=jnp.pi / 2 + 0.05, min_z=0
                                  min_z=min_z,
                                  max_z=max_z,
                                  phi_1=phi_samp, z_1=z_samp,
-                                 x=x, y=y, z=z)
+                                 X=jnp.array([x, y, z]))
 
     ax.imshow(img.transpose(), origin='lower')
 
@@ -223,7 +229,12 @@ def plot_proj_area(min_phi=jnp.pi / 2 - 0.05, max_phi=jnp.pi / 2 + 0.05, min_z=0
     return fig, ax
 
 
-def plot_marginal(x=0.0, y=0.0, z=0.25):
+def plot_marginal(X=None):
+    if X is None:
+        X = jnp.array([0.0, 0.0, 0.25])
+    else:
+        X = jnp.array(X)
+
     d = CylinderDetector()
 
     n_phi, n_z = d.n_detector_cells()
@@ -233,9 +244,9 @@ def plot_marginal(x=0.0, y=0.0, z=0.25):
     detector_quads = [d.detector_cell_from_index(idx) for idx in range(n)]
     detectors = jnp.array([list(quad.min()) + [d_phi, d_z] for quad in detector_quads])
 
-    marginal_mapped = jit(vmap(compute_marginal_probability, in_axes=(None, 0, None, None, None, None), out_axes=0))
+    marginal_mapped = jit(vmap(compute_marginal_probability, in_axes=(None, 0, None, None), out_axes=0))
 
-    vals = marginal_mapped(d.dim_radius_cm, detectors, detectors, x, y, z)
+    vals = marginal_mapped(d.dim_radius_cm, detectors, detectors, X)
     img = onp.array(vals).reshape((n_z, n_phi))
 
     fig, ax = plt.subplots()
@@ -251,38 +262,47 @@ def plot_marginal(x=0.0, y=0.0, z=0.25):
 
 
 if __name__ == '__main__':
-    # f = jit(jacobian_z_1)
-    # print('Start')
-    # for i in range(1000):
-    #     f(0.5, jnp.pi, 0.1, 0.1 + 0.1 * i/1000, 0.1, 0.25)
-    #     # jacobian_z_1(0.5, jnp.pi, 0.1, 0.1 + 0.1 * i/1000, 0.1, 0.25)
-
-    # for v in detector_proj(R=0.5, min_phi=jnp.pi-0.05, max_phi=jnp.pi+0.05, min_z=0.20, max_z=0.30, x=0.0, y=0.0, z=0.25):
-    #     print(onp.array(v))
-
-    # plot_proj_area()
-
-    # plot_proj_area(jnp.pi/4, jnp.pi/4 + jnp.pi/10, min_z=0.1, max_z=0.2, x=0.1, y=0.05)
-    # plt.show()
-
-    # d = CylinderDetector()
-    #
-    # n_phi, n_z = d.n_detector_cells()
-    # n = n_phi * n_z
-    # d_phi, d_z = 2.0 * onp.pi / n_phi, d.dim_height_cm / n_z
-    #
-    # detector_quads = [d.detector_cell_from_index(idx) for idx in range(n)]
-    # detectors = jnp.array([list(quad.min()) + [d_phi, d_z] for quad in detector_quads])
-    #
-    # print(compute_marginal_probability(R=d.dim_radius_cm,
-    #                                    detector_i=detectors[random.randint(0, n - 1), :],
-    #                                    detectors=detectors,
-    #                                    x=0.0,
-    #                                    y=0.0,
-    #                                    z=0.25))
+    #  Marginal Example Plots
 
     plot_marginal()
+    plt.savefig('figures/comparison/marginal_1.eps', format='eps', bbox_inches='tight')
     plt.show()
 
-    plot_marginal(0.1, 0.1, 0.25)
+    plot_marginal(X=[0.1, 0.1, 0.25])
+    plt.savefig('figures/comparison/marginal_2.eps', format='eps', bbox_inches='tight')
     plt.show()
+
+    plot_marginal(X=[0.1, 0.1, 0.4])
+    plt.savefig('figures/comparison/marginal_3.eps', format='eps', bbox_inches='tight')
+    plt.show()
+
+    #  Gradient eval on joint test
+    d = CylinderDetector()
+    n_phi, n_z = d.n_detector_cells()
+    n = n_phi * n_z
+    d_phi, d_z = 2.0 * onp.pi / n_phi, d.dim_height_cm / n_z
+
+    detector_quads = [d.detector_cell_from_index(idx) for idx in range(n)]
+    detectors = jnp.array([list(quad.min()) + [d_phi, d_z] for quad in detector_quads])
+
+    joint_grad = jit(grad(compute_joint_probability, 3))
+
+    det_i, det_j = random.choice(detectors), random.choice(detectors)
+
+    print('Compiled')
+
+    random_x = jnp.array([jnp.array([onp.random.random()*0.1,
+                           onp.random.random()*0.1,
+                           onp.random.random()*0.1]) for _ in range(100000)])
+
+    print('Compiling grad vec')
+    joint_grad_vec = jit(vmap(joint_grad, (None, None, None, 0), 0))
+    print('Finished')
+
+    vals = onp.sum(joint_grad_vec(d.dim_radius_cm, det_i, det_j, random_x), axis=0)
+
+    # print(joint_grad(d.dim_radius_cm, det_i, det_j, jnp.array([0.0, 0.0, 0.25])))
+    # print(joint_grad(d.dim_radius_cm, det_i, det_j, jnp.array([0.05, 0.09, 0.15])))
+    # print(joint_grad(d.dim_radius_cm, det_i, det_j, jnp.array([-0.03, 0.01, 0.35])))
+
+    print(vals)

@@ -70,8 +70,8 @@ detector = CylinderDetector()
 # rr, zz = np.meshgrid(r, z, indexing='ij')
 # hit_rate = Parallel(n_jobs=-1)(delayed(plot_3_sample_hit_rate)(detector, rr[i, j], zz[i, j]) for j in range(N) for i in range(N))
 # hit_rate = np.array(hit_rate).reshape((N, N))
-# h = plt.contourf(r, z, hit_rate)
-#
+# # h = plt.contourf(r, z, hit_rate)
+# plt.pcolormesh(hit_rate)
 # plt.title('LOR Detection Rate as a function of Particle Position')
 # plt.xlabel('Radial position, r')
 # plt.ylabel('z')
@@ -101,12 +101,14 @@ detector = CylinderDetector()
 
 # Plot 5: Detector cell analysis
 d5 = CylinderDetector()
+n_phi, n_z = d5.n_detector_cells()
 cells_hit_counts = np.zeros(shape=d5.n_detector_cells(), dtype=int)
 print(cells_hit_counts.shape)
 p5 = StaticParticle()
 # p5.set_position_cylindrical(r=0.96*d5.dim_radius_cm, theta=np.pi, z=d5.dim_height_cm/2)
 # p5.set_position_cylindrical(r=0.20, theta=np.pi/2, z=0.25)
-p5.set_position_cartesian(0.1, 0.1, 0.25)
+# p5.set_position_cartesian(0.1, 0.1, 0.25)
+p5.set_position_cartesian(0.1, 0.1, 0.4)
 p5.scatter_rate = 0.001
 print('Mean scattering distance:', 1/p5.scatter_rate)
 
@@ -123,30 +125,30 @@ print('Statistics', scatters, len(lors), scatters/(2*len(lors)))
 scatter_rate = scatters/(2*len(lors))
 
 for lor in lors:
-    for impact in lor:
-        i, j = d5.detector_cell_from_impact(impact=impact)
-        cells_hit_counts[i, j] += 1
+    i, j = lor
+    cells_hit_counts[i % n_phi, i // n_phi] += 1
+    cells_hit_counts[j % n_phi, j // n_phi] += 1
 
 plt.imshow(cells_hit_counts.transpose(), origin='lower')
-plt.colorbar()
+# plt.colorbar()
 plt.title(fr'Forward-Model Hit Count for particle at {p5.to_str_cylindrical(latex=True)}')
 # plt.suptitle(f'Scattering rate for individual photons is {scatter_rate:.00%}')
 plt.xlabel('Horizontal')
 plt.ylabel('Vertical')
-plt.savefig('figures/detector_hit_count_forward_model.eps', format='eps', bbox_inches='tight')
+plt.savefig('figures/comparison/forward_model_3.eps', format='eps', bbox_inches='tight')
 plt.show()
 
 # Plot 6: Detector cell analysis in another way
-x_plot, y_plot = [], []
-for lor in lors:
-    for impact in lor:
-        x, y, z = impact
-        x_plot.append(atan2(x, y))
-        y_plot.append(z)
-
-plt.hist2d(x_plot, y_plot, d5.n_detector_cells(), cmap=plt.cm.jet)
-plt.colorbar()
-plt.title('Detector Hit Count')
-plt.xlabel('Horizontal')
-plt.ylabel('Vertical')
-plt.show()
+# x_plot, y_plot = [], []
+# for lor in lors:
+#     for impact in lor:
+#         x, y, z = impact
+#         x_plot.append(atan2(x, y))
+#         y_plot.append(z)
+#
+# plt.hist2d(x_plot, y_plot, d5.n_detector_cells(), cmap=plt.cm.jet)
+# plt.colorbar()
+# plt.title('Detector Hit Count')
+# plt.xlabel('Horizontal')
+# plt.ylabel('Vertical')
+# plt.show()
