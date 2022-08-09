@@ -7,10 +7,49 @@ from geometry import atan2
 from plot import points_3d, arrow_3d
 
 vecs, opposite_vecs = [], []
-for _ in range(5000):
+for _ in range(1):
     # phi = np.random.uniform(0, 2 * np.pi)
     phi = np.random.uniform(0, 2*np.pi)
-    theta = np.arccos(1 - 2 * np.random.uniform(0, 1))
+    theta = np.arccos(1 - np.random.uniform(0, 1))
+
+    n = np.array([
+        np.cos(phi)*np.sin(theta),
+        np.sin(phi)*np.sin(theta),
+        np.cos(theta)
+    ])
+
+    e_phi = np.array([
+        -np.sin(phi),
+        np.cos(phi),
+        0.0
+    ])
+
+    e_theta = np.array([
+        -np.cos(phi)*np.cos(theta),
+        -np.sin(phi)*np.cos(theta),
+        np.sin(theta)
+    ])
+
+    fig = plt.figure(figsize=(10, 5))
+    ax = fig.add_subplot(111, projection='3d')
+
+    arrow_3d(ax, origin=[0, 0, 0], dir=n, color='r')
+    arrow_3d(ax, origin=[0, 0, 0], dir=e_phi, color='g')
+    arrow_3d(ax, origin=[0, 0, 0], dir=e_theta, color='b')
+
+    arrow_3d(ax, origin=[0, 0, 0], dir=[1, 0, 0], color='black')
+    arrow_3d(ax, origin=[0, 0, 0], dir=[0, 1, 0], color='purple')
+
+    ax.set_xlim((-1, 1)), ax.set_ylim((-1, 1)), ax.set_zlim((-1, 1))
+
+    print(n.dot(e_phi))
+    print(e_phi.dot(e_theta))
+    print(e_theta.dot(n))
+
+    plt.show()
+
+
+
 
     # # These vectors are incorrect for some angles
     # e_phi = np.array([
@@ -43,26 +82,26 @@ for _ in range(5000):
     #     (-1 if theta > np.pi/2 else 1) * np.cos(np.pi/2 - theta)
     # ])
 
-    theta_hat = np.arcsin(2 * np.random.uniform(0, 1) - 1)
-    theta = theta_hat + np.pi/2
-    # These vectors are incorrect for some angles
-    e_phi = np.array([
-        np.cos(phi),
-        np.sin(phi),
-        0.0
-    ])
-    e_theta = np.array([
-        np.sin(theta_hat) * np.cos(phi + np.pi/2),
-        np.sin(theta_hat) * np.sin(phi + np.pi/2),
-        np.cos(theta_hat)
-    ])
+    # theta_hat = np.arcsin(2 * np.random.uniform(0, 1) - 1)
+    # theta = theta_hat + np.pi/2
+    # # These vectors are incorrect for some angles
+    # e_phi = np.array([
+    #     np.cos(phi),
+    #     np.sin(phi),
+    #     0.0
+    # ])
+    # e_theta = np.array([
+    #     np.sin(theta_hat) * np.cos(phi + np.pi/2),
+    #     np.sin(theta_hat) * np.sin(phi + np.pi/2),
+    #     np.cos(theta_hat)
+    # ])
+    #
+    # n = np.cross(e_phi, e_theta)
+    # n = n / np.linalg.norm(n)
 
-    n = np.cross(e_phi, e_theta)
-    n = n / np.linalg.norm(n)
 
-
-    vecs.append(n)
-    opposite_vecs.append(-n)
+    # vecs.append(n)
+    # opposite_vecs.append(-n)
 
     # Debug plot
     # fig = plt.figure(figsize=(10, 5))
@@ -79,23 +118,23 @@ for _ in range(5000):
     # vecs.append(e_phi)
     # opposite_vecs.append(e_theta)
 
-fig = plt.figure(figsize=(10, 5))
-ax = fig.add_subplot(111, projection='3d')
-points_3d(ax=ax, points=np.array(vecs))
-
-fig = plt.figure(figsize=(10, 5))
-ax = fig.add_subplot(111, projection='3d')
-points_3d(ax=ax, points=np.array(opposite_vecs), color='r')
-
-plt.show()
-
-samples = vecs + opposite_vecs
-sample_theta = [np.arccos(p[2]) for p in samples]
-sample_phi = [atan2(p[0], p[1]) for p in samples]
-
-fig = plt.figure(figsize=(10, 5))
-plt.hist2d(x=sample_phi, y=sample_theta, bins=100)
-plt.colorbar()
-plt.show()
+# fig = plt.figure(figsize=(10, 5))
+# ax = fig.add_subplot(111, projection='3d')
+# points_3d(ax=ax, points=np.array(vecs))
+#
+# fig = plt.figure(figsize=(10, 5))
+# ax = fig.add_subplot(111, projection='3d')
+# points_3d(ax=ax, points=np.array(opposite_vecs), color='r')
+#
+# plt.show()
+#
+# samples = vecs + opposite_vecs
+# sample_theta = [np.arccos(p[2]) for p in samples]
+# sample_phi = [atan2(p[0], p[1]) for p in samples]
+#
+# fig = plt.figure(figsize=(10, 5))
+# plt.hist2d(x=sample_phi, y=sample_theta, bins=100)
+# plt.colorbar()
+# plt.show()
 
 
