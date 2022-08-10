@@ -3,7 +3,8 @@ import numpy as onp
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from jax import grad, jit, vmap
+from jax import grad, jit, vmap, random
+from jax._src.prng import PRNGKeyArray
 from matplotlib import patches
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from model import CylinderDetector
@@ -88,11 +89,6 @@ def smaller_than(x, threshold, gamma):
 
 def detector_proj(R, min_phi, max_phi, min_z, max_z, X):
     # Clockwise
-    # p1 = (G_phi(R, max_phi, x, y), G_z(R, max_phi, max_z, x, y, z))
-    # p2 = (G_phi(R, max_phi, x, y), G_z(R, max_phi, min_z, x, y, z))
-    # p3 = (G_phi(R, min_phi, x, y), G_z(R, min_phi, min_z, x, y, z))
-    # p4 = (G_phi(R, min_phi, x, y), G_z(R, min_phi, max_z, x, y, z))
-
     x, y, _ = X
     return G_phi(R, max_phi, x, y), G_phi(R, min_phi, x, y), \
            G_z(R, max_phi, max_z, X), G_z(R, max_phi, min_z, X), \
@@ -100,7 +96,7 @@ def detector_proj(R, min_phi, max_phi, min_z, max_z, X):
 
 
 def characteristic_function(R, detector_j, phi_1, z_1, X):
-    gamma = 500
+    gamma = 250
 
     j_phi_min, j_z_min, d_phi, d_z = detector_j
 
@@ -142,44 +138,68 @@ def projected_inside_detector(R, detector_j, phi_1, z_1, X):
 #     return bound  # in [0,1]
 
 
-def evaluate_integrand(R, detector_i, detector_j, X):
-    i_phi_min, i_z_min, d_phi, d_z = detector_i
-
-    centroid_phi = i_phi_min + d_phi / 2.0
-    centroid_z = i_z_min + d_z / 2.0
+def evaluate_integrand(R, sample_point, detector_j, X):
+    phi_1, z_1 = sample_point
 
     # Characteristic
-    char = characteristic_function(R=R, detector_j=detector_j, phi_1=centroid_phi, z_1=centroid_z, X=X)
+    char = characteristic_function(R=R, detector_j=detector_j, phi_1=phi_1, z_1=z_1, X=X)
 
     # Other parts of integrand
     x, y, _ = X
-    centroid_varphi, centroid_theta = G_varphi_theta(R, centroid_phi, centroid_z, X)
-    j_1 = jacobian_phi_1(R, centroid_varphi, x, y)
-    j_2 = jacobian_z_1(R, centroid_varphi, centroid_theta, X)
+    varphi, theta = G_varphi_theta(R, phi_1, z_1, X)
+    j_1 = jacobian_phi_1(R, varphi, x, y)
+    j_2 = jacobian_z_1(R, varphi, theta, X)
 
-    return (1 / (2 * jnp.pi)) * char * jnp.sin(centroid_theta) * j_1 * j_2
+    return (1 / (2 * jnp.pi)) * char * jnp.sin(theta) * j_1 * j_2
 
 
 @jit
-def compute_joint_probability(R, detector_i: tuple, detector_j: tuple, X: jnp.array):
+def compute_joint_probability(R, detector_i: tuple, detector_j: tuple, X: jnp.array, key: PRNGKeyArray):
     i_phi_min, i_z_min, d_phi, d_z = detector_i
+    d_phi_q, d_z_q = d_phi / 4.0, d_z / 4.0
     _, _, z = X
 
     # Integral estimate = Volume * integrand(centroid)
-    gamma = 500
-    valid_detectors = smaller_than(z, i_z_min + d_z / 2.0, gamma)
+    gamma = 50
+    # valid_detectors = smaller_than(z, i_z_min + d_z / 2.0, gamma)
     V = d_phi * d_z
 
-    return valid_detectors * V * evaluate_integrand(R=R, detector_i=detector_i, detector_j=detector_j, X=X)
+    # Eval points
+    # z_1_samples = [i_z_min + j * d_z_q for j in range(1, 4)]
+    # phi_1_samples = [i_phi_min + j * d_phi_q for j in range(1, 4)]
+    # samples = [[x, y] for x in phi_1_samples for y in z_1_samples]
+
+    # samples = [[i_phi_min + d_phi/2.0, i_z_min + d_z/2.0]]
+    #
+    # integrand = 0
+    # for phi_1, z_1 in samples:
+    #     valid = smaller_than(z, z_1, gamma)
+    #     integrand += valid * evaluate_integrand(R=R, phi_1=phi_1, z_1=z_1, detector_j=detector_j, X=X)
+    # integrand = integrand / len(samples)
+
+    key_1, key_2 = random.split(key, num=2)
+    samples = jnp.transpose(jnp.array([
+        i_phi_min + d_phi * random.uniform(key_1, shape=(5,)),
+        i_z_min + d_z * random.uniform(key_2, shape=(5,))
+    ]))  # [(phi_1, z_1), (phi_2, z_2), ... ]
+
+    integrand_vmap = vmap(evaluate_integrand, (None, 0, None, None), 0)
+    integrand = 1 / 5.0 * jnp.sum(integrand_vmap(R, samples, detector_j, X))
+
+    return smaller_than(z, i_z_min + d_z / 2.0, gamma) * V * integrand
 
 
 @jit
-def compute_marginal_probability(R, detector_i: jnp.array, detectors: jnp.array, X: jnp.array):
-    joint_vmapped_1 = vmap(compute_joint_probability, in_axes=(None, None, 0, None), out_axes=0)
-    joint_vmapped_2 = vmap(compute_joint_probability, in_axes=(None, 0, None, None), out_axes=0)
+def compute_marginal_probability(R, detector_i: jnp.array, detectors: jnp.array, X: jnp.array, key: PRNGKeyArray):
+    key_1, key_2 = random.split(key, num=2)
+    keys_1, keys_2 = random.split(key_1, num=jnp.shape(detectors)[0]),\
+                     random.split(key_2, num=jnp.shape(detectors)[0])
 
-    return jnp.sum(joint_vmapped_1(R, detector_i, detectors, X)) \
-           + jnp.sum(joint_vmapped_2(R, detectors, detector_i, X))
+    joint_vmapped_1 = vmap(compute_joint_probability, in_axes=(None, None, 0, None, 0), out_axes=0)
+    joint_vmapped_2 = vmap(compute_joint_probability, in_axes=(None, 0, None, None, 0), out_axes=0)
+
+    return jnp.sum(joint_vmapped_1(R, detector_i, detectors, X, keys_1)) \
+           + jnp.sum(joint_vmapped_2(R, detectors, detector_i, X, keys_2))
 
 
 def plot_proj_area(min_phi=jnp.pi / 2 - 0.05, max_phi=jnp.pi / 2 + 0.05, min_z=0.20, max_z=0.30, x=0.0, y=0.0, z=0.25):
@@ -240,9 +260,10 @@ def plot_marginal(X=None):
     detector_quads = [d.detector_cell_from_index(idx) for idx in range(n)]
     detectors = jnp.array([list(quad.min()) + [d_phi, d_z] for quad in detector_quads])
 
-    marginal_mapped = jit(vmap(compute_marginal_probability, in_axes=(None, 0, None, None), out_axes=0))
+    marginal_mapped = jit(vmap(compute_marginal_probability, in_axes=(None, 0, None, None, None), out_axes=0))
 
-    vals = marginal_mapped(d.dim_radius_cm, detectors, detectors, X)
+    key = random.PRNGKey(0)
+    vals = marginal_mapped(d.dim_radius_cm, detectors, detectors, X, key)
     img = onp.array(vals).reshape((n_z, n_phi))
 
     fig, ax = plt.subplots()
@@ -260,9 +281,9 @@ def plot_marginal(X=None):
 if __name__ == '__main__':
     #  Marginal Example Plots
 
-    plot_marginal()
-    plt.savefig('figures/comparison/marginal_1.eps', format='eps', bbox_inches='tight')
-    plt.show()
+    # plot_marginal()
+    # plt.savefig('figures/comparison/marginal_1.eps', format='eps', bbox_inches='tight')
+    # plt.show()
 
     plot_marginal(X=[0.1, 0.1, 0.25])
     plt.savefig('figures/comparison/marginal_2.eps', format='eps', bbox_inches='tight')
