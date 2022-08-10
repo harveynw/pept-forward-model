@@ -29,6 +29,9 @@ class CylinderDetector(Detector):
     detectors_height: float = 0.005
     detectors_width: float = 0.005
 
+    def _is_z_coordinate_in_detector(self, z):
+        return -self.dim_height_cm / 2.0 <= z <= self.dim_height_cm / 2.0
+
     def impact(self, lor_normal: np.ndarray, lor_annihilation: np.ndarray):
         p_x, p_y, p_z = lor_annihilation
         n_1, n_2, n_3 = lor_normal
@@ -44,7 +47,7 @@ class CylinderDetector(Detector):
 
         impact_1, impact_2 = lor_annihilation + lambda_1 * lor_normal, lor_annihilation + lambda_2 * lor_normal
 
-        did_impact = (0 < impact_1[2] < self.dim_height_cm) and (0 < impact_2[2] < self.dim_height_cm)
+        did_impact = self._is_z_coordinate_in_detector(impact_1[2]) and self._is_z_coordinate_in_detector(impact_2[2])
 
         return did_impact, lambda_1, lambda_2
 
@@ -52,7 +55,7 @@ class CylinderDetector(Detector):
         _, _, l = self.impact(lor_normal=lor_normal, lor_annihilation=lor_annihilation)
 
         impact = lor_annihilation + l * lor_normal
-        return 0 < impact[2] < self.dim_height_cm, l
+        return self._is_z_coordinate_in_detector(impact[2]), l
 
     def n_detector_cells(self) -> (int, int):
         n_horizontal = np.rint(2 * np.pi * self.dim_radius_cm / self.detectors_width)
@@ -68,12 +71,13 @@ class CylinderDetector(Detector):
         phi = atan2(y, x)
 
         # Ensure impact is on detector
-        assert np.isclose(self.dim_radius_cm, np.sqrt(x**2 + y**2)), 'Impact not on detector'
+        assert np.isclose(self.dim_radius_cm, np.sqrt(x ** 2 + y ** 2)), 'Impact not on detector'
+        assert -self.dim_height_cm / 2.0 <= z <= self.dim_height_cm / 2.0
 
         n_phi, _ = self.n_detector_cells()
         d_phi, d_z = self.del_detector_cells()
 
-        phi_index, z_index = int(phi // d_phi), int(z // d_z)
+        phi_index, z_index = int(phi // d_phi), int((z + self.dim_height_cm / 2.0) // d_z)
 
         return phi_index + n_phi * z_index
 
@@ -83,9 +87,12 @@ class CylinderDetector(Detector):
         assert 0 <= i < n_x * n_y
 
         y, x = divmod(i, n_x)
-        d_x, d_y = 2*np.pi/n_x, self.dim_height_cm/n_y
+        d_x, d_y = 2 * np.pi / n_x, self.dim_height_cm / n_y
 
-        return RectangleQuadrilateral([x*d_x, y*d_y], [(x+1)*d_x, (y+1)*d_y])
+        return RectangleQuadrilateral(
+            [x * d_x, -self.dim_height_cm / 2.0 + y * d_y],
+            [(x + 1) * d_x, -self.dim_height_cm / 2.0 + (y + 1) * d_y]
+        )
 
     def detector_cells_from_region(self, phi_range: tuple, z_range: tuple):
         # Cells indices that touch a given rectangular region
@@ -93,32 +100,32 @@ class CylinderDetector(Detector):
         z_min, z_max = z_range
 
         n_x, n_y = self.n_detector_cells()
-        d_phi, d_z = 2*np.pi/n_x, self.dim_height_cm/n_y
+        d_phi, d_z = 2 * np.pi / n_x, self.dim_height_cm / n_y
 
         # Range of values by index along dimension
-        phi_coords = (np.floor(phi_min/d_phi).astype(int), np.ceil(phi_max/d_phi).astype(int))
-        z_coords = (np.floor(z_min/d_z).astype(int), np.ceil(z_max/d_z).astype(int))
+        phi_coords = (np.floor(phi_min / d_phi).astype(int), np.ceil(phi_max / d_phi).astype(int))
+        z_coords = (np.floor(z_min / d_z).astype(int), np.ceil(z_max / d_z).astype(int))
 
         # Ensure on detector
         phi_coords = np.clip(np.array(phi_coords), 0, n_x - 1)
         z_coords = np.clip(np.array(z_coords), 0, n_y - 1)
 
         cells = []
-        for i in range(phi_coords[0], phi_coords[1]+1):
-            for j in range(z_coords[0], z_coords[1]+1):
+        for i in range(phi_coords[0], phi_coords[1] + 1):
+            for j in range(z_coords[0], z_coords[1] + 1):
                 cells += [i + n_x * j]
 
         return cells
 
     def debug_plot(self, ax: plt.axis):
         # Plots the cylinder detector
-
         diameter = 2 * np.pi * self.dim_radius_cm
         n_detectors_horizontal = int(diameter / self.detectors_width)
         n_detectors_vertical = int(self.dim_height_cm / self.detectors_height)
 
         theta_grid, z_grid = np.meshgrid(np.linspace(0, 2 * np.pi, n_detectors_horizontal),
-                                         np.linspace(0, self.dim_height_cm, n_detectors_vertical))
+                                         np.linspace(-self.dim_height_cm/2.0, self.dim_height_cm/2.0,
+                                                     n_detectors_vertical))
         x_grid = self.dim_radius_cm * np.cos(theta_grid)  # + center_x
         y_grid = self.dim_radius_cm * np.sin(theta_grid)  # + center_y
 
@@ -158,22 +165,39 @@ class StaticParticle(Point):
         n_scatters = 0
 
         for _ in range(n_lor):  # For each requested LOR
-            plane_phi = np.random.uniform(0, 2 * np.pi)
-            plane_theta_hat = np.arcsin(2 * np.random.uniform(0, 1) - 1)  # Inverse Transform Sampling
-
+            # plane_phi = np.random.uniform(0, 2 * np.pi)
+            # plane_theta_hat = np.arcsin(2 * np.random.uniform(0, 1) - 1)  # Inverse Transform Sampling
             # Normal vector to plane, defining the LOR direction
-            e_phi = np.array([
-                np.cos(plane_phi),
-                np.sin(plane_phi),
+            # e_phi = np.array([
+            #     np.cos(plane_phi),
+            #     np.sin(plane_phi),
+            #     0.0
+            # ])
+            # e_theta = np.array([
+            #     np.sin(plane_theta_hat) * np.cos(plane_phi + np.pi / 2),
+            #     np.sin(plane_theta_hat) * np.sin(plane_phi + np.pi / 2),
+            #     np.cos(plane_theta_hat)
+            # ])
+            # n = np.cross(e_phi, e_theta)
+            # n = n / np.linalg.norm(n)
+            varphi = np.random.uniform(0, 2 * np.pi)
+            theta = np.arccos(1 - np.random.uniform(0, 1))  # Inverse Transform Sampling
+
+            n = np.array([
+                np.sin(theta)*np.cos(varphi),
+                np.sin(theta)*np.sin(varphi),
+                np.cos(theta)
+            ])
+            e_varphi = np.array([
+                -np.sin(varphi),
+                np.cos(varphi),
                 0.0
             ])
             e_theta = np.array([
-                np.sin(plane_theta_hat) * np.cos(plane_phi + np.pi / 2),
-                np.sin(plane_theta_hat) * np.sin(plane_phi + np.pi / 2),
-                np.cos(plane_theta_hat)
+                -np.cos(theta)*np.cos(varphi),
+                -np.cos(theta)*np.sin(varphi),
+                np.sin(theta)
             ])
-            n = np.cross(e_phi, e_theta)
-            n = n / np.linalg.norm(n)
 
             # Compute collisions with detector:
             did_impact, lambda_1, lambda_2 = detector.impact(lor_normal=n,
@@ -211,7 +235,7 @@ class StaticParticle(Point):
                     scatter_point = self.get_position_cartesian() + (np.sign(l) * first_scatter) * n
 
                     # Compute new normal (with a random rotation)
-                    change_of_basis = np.array([e_phi, e_theta, np.sign(l) * n]).transpose()
+                    change_of_basis = np.array([e_varphi, e_theta, np.sign(l) * n]).transpose()
                     new_n = change_of_basis.dot(self._generate_scatter_rotation().dot([0, 0, 1]))
 
                     if debug_ax is not None:
