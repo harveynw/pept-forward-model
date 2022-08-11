@@ -95,9 +95,7 @@ def detector_proj(R, min_phi, max_phi, min_z, max_z, X):
            G_z(R, min_phi, min_z, X), G_z(R, min_phi, max_z, X)
 
 
-def characteristic_function(R, detector_j, phi_1, z_1, X):
-    gamma = 250
-
+def characteristic_function(R, detector_j, phi_1, z_1, X, gamma):
     j_phi_min, j_z_min, d_phi, d_z = detector_j
 
     x, y, _ = X
@@ -111,8 +109,8 @@ def characteristic_function(R, detector_j, phi_1, z_1, X):
     return cond_1 * cond_2 * cond_3 * cond_4
 
 
-def projected_inside_detector(R, detector_j, phi_1, z_1, X):
-    return characteristic_function(R, detector_j, phi_1, z_1, X)
+def projected_inside_detector(R, detector_j, phi_1, z_1, X, gamma):
+    return characteristic_function(R, detector_j, phi_1, z_1, X, gamma)
 
 
 # def inside_projected_detector(R, min_phi, max_phi, min_z, max_z, phi_2, z_2, x, y, z):
@@ -138,11 +136,11 @@ def projected_inside_detector(R, detector_j, phi_1, z_1, X):
 #     return bound  # in [0,1]
 
 
-def evaluate_integrand(R, sample_point, detector_j, X):
+def evaluate_integrand(R, sample_point, detector_j, X, gamma):
     phi_1, z_1 = sample_point
 
     # Characteristic
-    char = characteristic_function(R=R, detector_j=detector_j, phi_1=phi_1, z_1=z_1, X=X)
+    char = characteristic_function(R=R, detector_j=detector_j, phi_1=phi_1, z_1=z_1, X=X, gamma=gamma)
 
     # Other parts of integrand
     x, y, _ = X
@@ -189,7 +187,7 @@ def evaluate_integrand(R, sample_point, detector_j, X):
 #     return smaller_than(z, i_z_min + d_z / 2.0, gamma) * V * integrand
 
 @jit
-def compute_joint_probability(R, detector_i: tuple, detector_j: tuple, X: np.array, unifs: np.array):
+def compute_joint_probability(R, detector_i: tuple, detector_j: tuple, X: np.array, gamma, unifs: np.array):
     i_phi_min, i_z_min, d_phi, d_z = detector_i
     _, _, z = X
 
@@ -197,7 +195,6 @@ def compute_joint_probability(R, detector_i: tuple, detector_j: tuple, X: np.arr
     detector_diff = np.array([d_phi, d_z])
 
     # Integral estimate = Volume * integrand(centroid)
-    gamma = 500
     V = d_phi * d_z
 
     integrand = 0
@@ -205,19 +202,20 @@ def compute_joint_probability(R, detector_i: tuple, detector_j: tuple, X: np.arr
     for unif in unifs:
         # Sample point is corner + unif * diff
         sample = detector_corner + unif * detector_diff
-        integrand += smaller_than(z, sample[1], gamma) * evaluate_integrand(R, sample, detector_j, X)
+        integrand += smaller_than(z, sample[1], gamma) * evaluate_integrand(R, sample, detector_j, X, gamma)
         n_samples += 1.0
     integrand = 1 / n_samples * integrand
 
     return V * integrand
 
-@jit
-def compute_marginal_probability(R, detector_i: np.array, detectors: np.array, X: np.array, unifs: np.array):
-    joint_vmapped_1 = vmap(compute_joint_probability, in_axes=(None, None, 0, None, None), out_axes=0)
-    joint_vmapped_2 = vmap(compute_joint_probability, in_axes=(None, 0, None, None, None), out_axes=0)
 
-    return np.sum(joint_vmapped_1(R, detector_i, detectors, X, unifs))\
-           + np.sum(joint_vmapped_2(R, detectors, detector_i, X, unifs))
+@jit
+def compute_marginal_probability(R, detector_i: np.array, detectors: np.array, X: np.array, gamma, unifs: np.array):
+    joint_vmapped_1 = vmap(compute_joint_probability, in_axes=(None, None, 0, None, None, None), out_axes=0)
+    joint_vmapped_2 = vmap(compute_joint_probability, in_axes=(None, 0, None, None, None, None), out_axes=0)
+
+    return np.sum(joint_vmapped_1(R, detector_i, detectors, X, gamma, unifs))\
+           + np.sum(joint_vmapped_2(R, detectors, detector_i, X, gamma, unifs))
 
 
 def plot_proj_area(min_phi=np.pi / 2 - 0.05, max_phi=np.pi / 2 + 0.05, min_z=0.20, max_z=0.30, x=0.0, y=0.0, z=0.25):
@@ -263,7 +261,7 @@ def plot_proj_area(min_phi=np.pi / 2 - 0.05, max_phi=np.pi / 2 + 0.05, min_z=0.2
     return fig, ax
 
 
-def plot_marginal(X=None):
+def plot_marginal(X=None, gamma=50):
     if X is None:
         X = np.array([0.0, 0.0, 0.25])
     else:
@@ -273,19 +271,19 @@ def plot_marginal(X=None):
 
     n_phi, n_z = d.n_detector_cells()
     n = n_phi * n_z
-    d_phi, d_z = 2.0 * onp.pi / n_phi, d.dim_height_cm / n_z
+    d_phi, d_z = d.del_detector_cells()
 
     detector_quads = [d.detector_cell_from_index(idx) for idx in range(n)]
     detectors = np.array([list(quad.min()) + [d_phi, d_z] for quad in detector_quads])
 
-    marginal_mapped = jit(vmap(compute_marginal_probability, in_axes=(None, 0, None, None, None), out_axes=0))
+    marginal_mapped = jit(vmap(compute_marginal_probability, in_axes=(None, 0, None, None, None, None), out_axes=0))
 
     print('Generating RNG uniforms for MC Samples')
     key = random.PRNGKey(0)
     unifs = random.uniform(key=key, shape=(10, 2))
 
     print('Evaluating marginal over entire detector')
-    vals = marginal_mapped(d.dim_radius_cm, detectors, detectors, X, unifs)
+    vals = marginal_mapped(d.dim_radius_cm, detectors, detectors, X, gamma, unifs)
 
     img = onp.array(vals).reshape((n_z, n_phi))
 

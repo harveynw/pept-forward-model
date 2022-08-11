@@ -267,6 +267,10 @@ class StaticParticle(Point):
                 detector_i = detector.detector_index_from_impact(final_impacts[0])
                 detector_j = detector.detector_index_from_impact(final_impacts[1])
 
+                # detector_i is has higher z range by convention
+                if final_impacts[1][2] > final_impacts[0][2]:
+                    detector_i, detector_j = detector_j, detector_i
+
                 # Return detector indices
                 impacts += [(detector_i, detector_j)]
 
