@@ -308,7 +308,7 @@ if __name__ == '__main__':
     # plt.savefig('figures/comparison/marginal_1.eps', format='eps', bbox_inches='tight')
     # plt.show()
 
-    plot_marginal(X=[0.1, 0.1, 0.25])
+    plot_marginal(X=[0.1, 0.1, 0.0])
     plt.savefig('figures/comparison/marginal_2.eps', format='eps', bbox_inches='tight')
     plt.show()
 
