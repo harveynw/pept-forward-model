@@ -40,7 +40,7 @@ def single_dimensional_likelihood(R, H, rate, T, detections_i, detections_j, X, 
     joint_evaluations = joint_vmapped(R, detections_i, detections_j, X, gamma, unifs)
 
     # term_1 = np.sum(np.log(joint_evaluations))
-    term_1 = np.sum(np.log(rate * T * joint_evaluations))
+    term_1 = np.sum(np.log(rate * T * (joint_evaluations + 0.05) ))
     term_2 = - rate * T * G_solid_angle_approx(R, H, X)
     return term_1 + term_2
 
@@ -85,11 +85,12 @@ def single_dimensional_likelihood_plot(d: CylinderDetector, activity: float, T: 
 
     R, H = d.dim_radius_cm, d.dim_height_cm
     n_samps = 100
-    x, y, z = onp.linspace(-R, R, n_samps), onp.linspace(-R, R, n_samps), onp.linspace(-H / 2, H, n_samps)
-    img_1, img_2 = onp.zeros((n_samps, n_samps)), onp.zeros((n_samps, n_samps))
+    x, y, z = onp.linspace(-R, R, n_samps), onp.linspace(-R, R, n_samps), onp.linspace(-H / 2.0, H / 2.0, n_samps)
+    d_x, d_y, d_z = x[1] - x[0], y[1] - y[0], z[1] - z[0]
+    img_1, img_2 = onp.full((n_samps, n_samps), -onp.inf), onp.full((n_samps, n_samps), -onp.inf)
 
     # Plotting over (x, y, z=0.0)
-    points = [[x_s, y_s, 0.0] for x_s in x for y_s in y if onp.sqrt(x_s ** 2 + y_s ** 2) < R]
+    points = [[x_s+d_x/2, y_s+d_y/2, 0.0] for x_s in x for y_s in y if onp.sqrt(x_s ** 2 + y_s ** 2) < R]
     indices = [[i, j] for i, x_s in enumerate(x) for j, y_s in enumerate(y) if onp.sqrt(x_s ** 2 + y_s ** 2) < R]
     vals = eval_single_dimensional_likelihood(d, activity, T, lors, gamma, np.array(points))
     for idx, (i, j) in enumerate(indices):
@@ -98,7 +99,7 @@ def single_dimensional_likelihood_plot(d: CylinderDetector, activity: float, T: 
     print('Sampled x-y plot')
 
     # Plotting over (x, y=0.0, z)
-    points = [[x_s, 0.0, z_s] for x_s in x for z_s in z]
+    points = [[x_s+d_x/2, 0.0, z_s+d_z/2] for x_s in x for z_s in z]
     indices = [[i, j] for i, x_s in enumerate(x) for j, z_s in enumerate(z)]
     vals = eval_single_dimensional_likelihood(d, activity, T, lors, gamma, np.array(points))
     for idx, (i, j) in enumerate(indices):
@@ -165,9 +166,15 @@ if __name__ == '__main__':
     lors, scatters = p.simulate_emissions(detector=det, n_lor=int(T * activity))
     print(f'Simulations finished, LoRs={len(lors)}, Scatters={scatters}')
 
-    args = {'d': det, 'activity': activity, 'T': T, 'gamma': 50.0, 'lors': lors}
+    args = {'d': det, 'activity': activity, 'T': T, 'gamma': 2.5, 'lors': lors}
 
     print(eval_single_dimensional_likelihood(**args, X=X))
+    print(eval_single_dimensional_likelihood(**args, X=np.array([0.01, 0.0, 0.0])))
+    print(eval_single_dimensional_likelihood(**args, X=np.array([-0.01, 0.0, 0.0])))
+    print(eval_single_dimensional_likelihood(**args, X=np.array([0.0, 0.01, 0.0])))
+    print(eval_single_dimensional_likelihood(**args, X=np.array([0.0, -0.01, 0.0])))
+
+
     print(eval_single_dimensional_likelihood(**args, X=np.array([0.0, 0.0, 0.1])))
     print(eval_single_dimensional_likelihood(**args, X=np.array([0.0, 0.0, -0.1])))
     print(eval_single_dimensional_likelihood(**args, X=np.array([0.24, 0.0, 0.0])))

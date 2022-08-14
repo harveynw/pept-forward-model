@@ -27,12 +27,12 @@ def F_lambdas_hat(R, varphi, x, y):
 
 def F_phi_1(R, varphi, x, y):
     l_1, _ = F_lambdas_hat(R, varphi, x, y)
-    return atan2(y + l_1 * np.cos(varphi), x + l_1 * np.sin(varphi))
+    return atan2(y + l_1 * np.sin(varphi), x + l_1 * np.cos(varphi))
 
 
 def F_phi_2(R, varphi, x, y):
     _, l_2 = F_lambdas_hat(R, varphi, x, y)
-    return atan2(y + l_2 * np.cos(varphi), x + l_2 * np.sin(varphi))
+    return atan2(y + l_2 * np.sin(varphi), x + l_2 * np.cos(varphi))
 
 
 def F_z_1(R, varphi, theta, X):
