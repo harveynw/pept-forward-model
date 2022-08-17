@@ -10,7 +10,7 @@ from model import CylinderDetector, StaticParticle
 
 
 @jit
-def _solid_angle_integrand(R, H, X, varphi):
+def _G_solid_angle_integrand(R, H, X, varphi):
     x, y, z = X
 
     R_varphi = x * np.cos(varphi) + y * np.sin(varphi)
@@ -18,19 +18,29 @@ def _solid_angle_integrand(R, H, X, varphi):
     theta_1 = (-R_varphi + np.sqrt(R_varphi ** 2 - (x ** 2 + y ** 2 - R ** 2))) / (H / 2.0 - z)
     theta_2 = (-R_varphi - np.sqrt(R_varphi ** 2 - (x ** 2 + y ** 2 - R ** 2))) / (-H / 2.0 - z)
 
-    theta_min = np.max(np.array([theta_1, theta_2]))
+    theta_max = np.max(np.array([theta_1, theta_2]))
 
-    return np.cos(np.arctan(theta_min))
+    return np.cos(np.arctan(theta_max))
+
+@jit
+def H_solid_angle_approx(R, H, X):
+    # Trapezoidal Rule
+    d_varphi = 2 * np.pi / 100
+    varphi = np.arange(start=d_varphi, stop=2 * np.pi, step=d_varphi)
+    integrand_vmap = vmap(_G_solid_angle_integrand, (None, None, None, 0), 0)
+    f_x_0 = _G_solid_angle_integrand(R, H, X, 0.0)
+    f_x_N = _G_solid_angle_integrand(R, H, X, 2 * np.pi)
+    return (1 / (2 * np.pi)) * (d_varphi / 2.0) * (f_x_0 + f_x_N + 2.0 * np.sum(integrand_vmap(R, H, X, varphi)))
 
 
 @jit
 def G_solid_angle_approx(R, H, X):
     # Trapezoidal Rule
-    d_varphi = 2 * np.pi / 10
+    d_varphi = 2 * np.pi / 100
     varphi = np.arange(start=d_varphi, stop=2 * np.pi, step=d_varphi)
-    integrand_vmap = vmap(_solid_angle_integrand, (None, None, None, 0), 0)
-    f_x_0 = _solid_angle_integrand(R, H, X, 0.0)
-    f_x_N = _solid_angle_integrand(R, H, X, 2 * np.pi)
+    integrand_vmap = vmap(_G_solid_angle_integrand, (None, None, None, 0), 0)
+    f_x_0 = _G_solid_angle_integrand(R, H, X, 0.0)
+    f_x_N = _G_solid_angle_integrand(R, H, X, 2 * np.pi)
     return (1 / (2 * np.pi)) * (d_varphi / 2.0) * (f_x_0 + f_x_N + 2.0 * np.sum(integrand_vmap(R, H, X, varphi)))
 
 
@@ -40,7 +50,7 @@ def single_dimensional_likelihood(R, H, rate, T, detections_i, detections_j, X, 
     joint_evaluations = joint_vmapped(R, detections_i, detections_j, X, gamma, unifs)
 
     # term_1 = np.sum(np.log(joint_evaluations))
-    term_1 = np.sum(np.log(rate * T * (joint_evaluations + 0.05) ))
+    term_1 = np.sum(np.log(rate * T * joint_evaluations))
     term_2 = - rate * T * G_solid_angle_approx(R, H, X)
     return term_1 + term_2
 
@@ -166,7 +176,7 @@ if __name__ == '__main__':
     lors, scatters = p.simulate_emissions(detector=det, n_lor=int(T * activity))
     print(f'Simulations finished, LoRs={len(lors)}, Scatters={scatters}')
 
-    args = {'d': det, 'activity': activity, 'T': T, 'gamma': 2.5, 'lors': lors}
+    args = {'d': det, 'activity': activity, 'T': T, 'gamma': 50.0, 'lors': lors}
 
     print(eval_single_dimensional_likelihood(**args, X=X))
     print(eval_single_dimensional_likelihood(**args, X=np.array([0.01, 0.0, 0.0])))
