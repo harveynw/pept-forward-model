@@ -25,6 +25,11 @@ def F_lambdas_hat(R, varphi, x, y):
     return -c_1 + c_2, -c_1 - c_2
 
 
+def F_lambdas(R, varphi, theta, x, y):
+    l_1_hat, l_2_hat = F_lambdas_hat(R, varphi, x, y)
+    return 1.0/np.sin(theta) * l_1_hat, 1.0/np.sin(theta) * l_2_hat
+
+
 def F_phi_1(R, varphi, x, y):
     l_1, _ = F_lambdas_hat(R, varphi, x, y)
     return atan2(y + l_1 * np.sin(varphi), x + l_1 * np.cos(varphi))
@@ -60,13 +65,24 @@ def G_z(R, phi_1, z_1, X):
     return z_1 + omega * (z - z_1)
 
 
-def G_varphi_theta(R, phi_1, z_1, X):
+def G_varphi_theta_1(R, phi_1, z_1, X):
     incident = np.array([R * np.cos(phi_1), R * np.sin(phi_1), z_1])
     diff = incident - X
-    l_1 = np.sqrt(np.dot(diff, diff))
+    mu_1 = np.sqrt(np.dot(diff, diff))
 
     varphi = atan2(diff[1], diff[0])
-    theta = np.arccos((z_1 - X[2]) / l_1)
+    theta = np.arccos((z_1 - X[2]) / mu_1)
+
+    return varphi, theta
+
+
+def G_varphi_theta_2(R, phi_2, z_2, X):
+    incident = np.array([R * np.cos(phi_2), R * np.sin(phi_2), z_2])
+    diff = incident - X
+    mu_2 = -np.sqrt(np.dot(diff, diff))
+
+    varphi = atan2(-diff[1], -diff[0])
+    theta = np.arccos((z_2 - X[2]) / mu_2)
 
     return varphi, theta
 
@@ -77,6 +93,14 @@ def jacobian_phi_1(R, varphi, x, y):
 
 def jacobian_z_1(R, varphi, theta, X):
     return 1.0 / np.abs(grad(F_z_1, 2)(R, varphi, theta, X))
+
+
+def jacobian_phi_2(R, varphi, x, y):
+    return 1.0 / np.abs(grad(F_phi_2, 1)(R, varphi, x, y))
+
+
+def jacobian_z_2(R, varphi, theta, X):
+    return 1.0 / np.abs(grad(F_z_2, 2)(R, varphi, theta, X))
 
 
 def greater_than(x, threshold, gamma):
@@ -136,7 +160,7 @@ def projected_inside_detector(R, detector_j, phi_1, z_1, X, gamma):
 #     return bound  # in [0,1]
 
 
-def evaluate_integrand(R, sample_point, detector_j, X, gamma):
+def evaluate_joint_integrand(R, sample_point, detector_j, X, gamma):
     phi_1, z_1 = sample_point
 
     # Characteristic
@@ -144,11 +168,31 @@ def evaluate_integrand(R, sample_point, detector_j, X, gamma):
 
     # Other parts of integrand
     x, y, _ = X
-    varphi, theta = G_varphi_theta(R, phi_1, z_1, X)
+    varphi, theta = G_varphi_theta_1(R, phi_1, z_1, X)
     j_1 = jacobian_phi_1(R, varphi, x, y)
     j_2 = jacobian_z_1(R, varphi, theta, X)
 
     return (1 / (2 * np.pi)) * char * np.sin(theta) * j_1 * j_2
+
+
+def evaluate_i_integrand(R, sample_point, X):
+    x, y, _ = X
+    phi_1, z_1 = sample_point
+    varphi, theta = G_varphi_theta_1(R, phi_1, z_1, X)
+    j_1 = jacobian_phi_1(R, varphi, x, y)
+    j_2 = jacobian_z_1(R, varphi, theta, X)
+
+    return (1 / (2 * np.pi)) * np.sin(theta) * j_1 * j_2
+
+
+def evaluate_j_integrand(R, sample_point, X):
+    x, y, _ = X
+    phi_2, z_2 = sample_point
+    varphi, theta = G_varphi_theta_2(R, phi_2, z_2, X)
+    j_1 = jacobian_phi_2(R, varphi, x, y)
+    j_2 = jacobian_z_2(R, varphi, theta, X)
+
+    return (1 / (2 * np.pi)) * np.sin(theta) * j_1 * j_2
 
 
 # @jit
@@ -172,7 +216,7 @@ def evaluate_integrand(R, sample_point, detector_j, X, gamma):
 #     # integrand = 0
 #     # for phi_1, z_1 in samples:
 #     #     valid = smaller_than(z, z_1, gamma)
-#     #     integrand += valid * evaluate_integrand(R=R, phi_1=phi_1, z_1=z_1, detector_j=detector_j, X=X)
+#     #     integrand += valid * evaluate_joint_integrand(R=R, phi_1=phi_1, z_1=z_1, detector_j=detector_j, X=X)
 #     # integrand = integrand / len(samples)
 #
 #     key_1, key_2 = random.split(key, num=2)
@@ -181,13 +225,14 @@ def evaluate_integrand(R, sample_point, detector_j, X, gamma):
 #         i_z_min + d_z * random.uniform(key_2, shape=(5,))
 #     ]))  # [(phi_1, z_1), (phi_2, z_2), ... ]
 #
-#     integrand_vmap = vmap(evaluate_integrand, (None, 0, None, None), 0)
+#     integrand_vmap = vmap(evaluate_joint_integrand, (None, 0, None, None), 0)
 #     integrand = 1 / 5.0 * np.sum(integrand_vmap(R, samples, detector_j, X))
 #
 #     return smaller_than(z, i_z_min + d_z / 2.0, gamma) * V * integrand
 
 @jit
 def compute_joint_probability(R, detector_i: tuple, detector_j: tuple, X: np.array, gamma, unifs: np.array):
+    # P(i, j) Monte Carlo Integration
     i_phi_min, i_z_min, d_phi, d_z = detector_i
     _, _, z = X
 
@@ -202,11 +247,30 @@ def compute_joint_probability(R, detector_i: tuple, detector_j: tuple, X: np.arr
     for unif in unifs:
         # Sample point is corner + unif * diff
         sample = detector_corner + unif * detector_diff
-        integrand += smaller_than(z, sample[1], gamma) * evaluate_integrand(R, sample, detector_j, X, gamma)
+        integrand += smaller_than(z, sample[1], gamma) * evaluate_joint_integrand(R, sample, detector_j, X, gamma)
         n_samples += 1.0
     integrand = 1 / n_samples * integrand
 
     return V * integrand
+
+@jit
+def compute_i_marginal_probability(R, detector_i: tuple, X: np.array):
+    # P(i, .) midpoint rule integration
+    i_phi_min, i_z_min, d_phi, d_z = detector_i
+
+    centroid = np.array([i_phi_min + d_phi/2.0, i_z_min + d_z/2.0])
+
+    return d_phi * d_z * evaluate_i_integrand(R, centroid, X)
+
+
+@jit
+def compute_j_marginal_probability(R, detector_j: tuple, X: np.array):
+    # P(., j) midpoint rule integration
+    j_phi_min, j_z_min, d_phi, d_z = detector_j
+
+    centroid = np.array([j_phi_min + d_phi / 2.0, j_z_min + d_z / 2.0])
+
+    return d_phi * d_z * evaluate_j_integrand(R, centroid, X)
 
 
 @jit
