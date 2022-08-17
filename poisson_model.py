@@ -59,7 +59,7 @@ def G_solid_angle_approx(R, H, X):
 
 @jit
 def _scattering_density_integrand(R, varphi, theta, X):
-    mu = 0.01
+    mu = 3.0
     x, y, z = X
     l_1, l_2 = F_lambdas(R, varphi, theta, x, y)
     e_1, e_2 = np.exp(-mu * l_1), np.exp(mu * l_2)
@@ -273,7 +273,10 @@ if __name__ == '__main__':
     # Setup particle and set to no scattering
     det = CylinderDetector()
     p = StaticParticle()
-    p.scatter_rate = 0.000001
+    p.set_position_cylindrical(r=0.1, theta=0.0, z=0.0)
+    p.set_position_cartesian(x=0.1, y=0.0, z=0.0)
+    p.set_position_cartesian(x=0.0, y=0.1, z=0.0)
+    p.scatter_rate = 3.0
     T, activity = 1.0, 10 ** 4
     X = np.array(p.get_position_cartesian())
 
@@ -283,15 +286,23 @@ if __name__ == '__main__':
 
     args = {'d': det, 'activity': activity, 'T': T, 'gamma': 50.0, 'lors': lors}
 
-    print(eval_single_dimensional_likelihood(**args, X=X))
-    print(eval_single_dimensional_likelihood(**args, X=np.array([0.01, 0.0, 0.0])))
-    print(eval_single_dimensional_likelihood(**args, X=np.array([-0.01, 0.0, 0.0])))
-    print(eval_single_dimensional_likelihood(**args, X=np.array([0.0, 0.01, 0.0])))
-    print(eval_single_dimensional_likelihood(**args, X=np.array([0.0, -0.01, 0.0])))
+    # print(eval_single_dimensional_likelihood(**args, X=X))
+    # print(eval_single_dimensional_likelihood(**args, X=np.array([0.01, 0.0, 0.0])))
+    # print(eval_single_dimensional_likelihood(**args, X=np.array([-0.01, 0.0, 0.0])))
+    # print(eval_single_dimensional_likelihood(**args, X=np.array([0.0, 0.01, 0.0])))
+    # print(eval_single_dimensional_likelihood(**args, X=np.array([0.0, -0.01, 0.0])))
+    # print(eval_single_dimensional_likelihood(**args, X=np.array([0.0, 0.0, 0.1])))
+    # print(eval_single_dimensional_likelihood(**args, X=np.array([0.0, 0.0, -0.1])))
+    # print(eval_single_dimensional_likelihood(**args, X=np.array([0.24, 0.0, 0.0])))
 
-    print(eval_single_dimensional_likelihood(**args, X=np.array([0.0, 0.0, 0.1])))
-    print(eval_single_dimensional_likelihood(**args, X=np.array([0.0, 0.0, -0.1])))
-    print(eval_single_dimensional_likelihood(**args, X=np.array([0.24, 0.0, 0.0])))
+    fig, _ = single_dimensional_likelihood_plot(**args)
+    fig.title(rf'Likelihood, scattering rate $\mu={args["activity"]}$')
+    plt.savefig('figures/likelihood/scatter_1.png', format='png')
 
-    single_dimensional_likelihood_plot(**args)
-    plt.show()
+    fig, _ = single_dimensional_likelihood_plot(**args)
+    fig.title(rf'Likelihood, scattering rate $\mu={args["activity"]}$')
+    plt.savefig('figures/likelihood/scatter_1.png', format='png')
+
+    fig, _ = single_dimensional_likelihood_plot(**args)
+    fig.title(rf'Likelihood, scattering rate $\mu={args["activity"]}$')
+    plt.savefig('figures/likelihood/scatter_1.png', format='png')
