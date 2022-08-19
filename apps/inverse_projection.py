@@ -3,7 +3,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 
 from geometry import phi_proj, z_proj
-from integration import projection_region
+from misc.integration import projection_region
 from model import CylinderDetector, StaticParticle
 from plot import detector_plot
 

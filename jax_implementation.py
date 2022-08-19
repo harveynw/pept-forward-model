@@ -4,7 +4,6 @@ import jax.numpy as np
 import matplotlib.pyplot as plt
 
 from jax import grad, jit, vmap, random
-from jax._src.prng import PRNGKeyArray
 from matplotlib import patches
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from model import CylinderDetector
@@ -137,29 +136,6 @@ def projected_inside_detector(R, detector_j, phi_1, z_1, X, gamma):
     return characteristic_function(R, detector_j, phi_1, z_1, X, gamma)
 
 
-# def inside_projected_detector(R, min_phi, max_phi, min_z, max_z, phi_2, z_2, x, y, z):
-#     gamma = 500
-#
-#     phi_bound_max, phi_bound_min, z1, z2, z3, z4 = detector_proj(R, min_phi, max_phi, min_z, max_z, x, y, z)
-#
-#     # Phi bounds
-#     phi_bound_1 = greater_than(phi_2, phi_bound_min, gamma)
-#     phi_bound_2 = smaller_than(phi_2, phi_bound_max, gamma)
-#
-#     bound = np.where(phi_bound_min > phi_bound_max,
-#                       phi_bound_1 + phi_bound_2,
-#                       phi_bound_1 * phi_bound_2)
-#     t = np.where(phi_bound_min > phi_bound_max,
-#                   (phi_2 - phi_bound_min) / (phi_bound_max + 2 * np.pi - phi_bound_min),
-#                   (phi_2 - phi_bound_min) / (phi_bound_max - phi_bound_min))
-#
-#     # Z bounds
-#     bound = bound * greater_than(z_2, z1 + t * (z4 - z1), gamma)
-#     bound = bound * smaller_than(z_2, z2 + t * (z2 - z3), gamma)
-#
-#     return bound  # in [0,1]
-
-
 def evaluate_joint_integrand(R, sample_point, detector_j, X, gamma):
     phi_1, z_1 = sample_point
 
@@ -194,41 +170,6 @@ def evaluate_j_integrand(R, sample_point, X):
 
     return (1 / (2 * np.pi)) * np.sin(theta) * j_1 * j_2
 
-
-# @jit
-# def compute_joint_probability(R, detector_i: tuple, detector_j: tuple, X: np.array, key: PRNGKeyArray):
-#     i_phi_min, i_z_min, d_phi, d_z = detector_i
-#     d_phi_q, d_z_q = d_phi / 4.0, d_z / 4.0
-#     _, _, z = X
-#
-#     # Integral estimate = Volume * integrand(centroid)
-#     gamma = 50
-#     # valid_detectors = smaller_than(z, i_z_min + d_z / 2.0, gamma)
-#     V = d_phi * d_z
-#
-#     # Eval points
-#     # z_1_samples = [i_z_min + j * d_z_q for j in range(1, 4)]
-#     # phi_1_samples = [i_phi_min + j * d_phi_q for j in range(1, 4)]
-#     # samples = [[x, y] for x in phi_1_samples for y in z_1_samples]
-#
-#     # samples = [[i_phi_min + d_phi/2.0, i_z_min + d_z/2.0]]
-#     #
-#     # integrand = 0
-#     # for phi_1, z_1 in samples:
-#     #     valid = smaller_than(z, z_1, gamma)
-#     #     integrand += valid * evaluate_joint_integrand(R=R, phi_1=phi_1, z_1=z_1, detector_j=detector_j, X=X)
-#     # integrand = integrand / len(samples)
-#
-#     key_1, key_2 = random.split(key, num=2)
-#     samples = np.transpose(np.array([
-#         i_phi_min + d_phi * random.uniform(key_1, shape=(5,)),
-#         i_z_min + d_z * random.uniform(key_2, shape=(5,))
-#     ]))  # [(phi_1, z_1), (phi_2, z_2), ... ]
-#
-#     integrand_vmap = vmap(evaluate_joint_integrand, (None, 0, None, None), 0)
-#     integrand = 1 / 5.0 * np.sum(integrand_vmap(R, samples, detector_j, X))
-#
-#     return smaller_than(z, i_z_min + d_z / 2.0, gamma) * V * integrand
 
 @jit
 def compute_joint_probability(R, detector_i: tuple, detector_j: tuple, X: np.array, gamma, unifs: np.array):

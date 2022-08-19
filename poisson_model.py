@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 from jax import jit, vmap, random
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from jax_implementation import compute_joint_probability, F_lambdas, compute_i_marginal_probability
+from jax_implementation import compute_joint_probability, F_lambdas, compute_i_marginal_probability, \
+    compute_j_marginal_probability
 from model import CylinderDetector, StaticParticle
 
 
@@ -27,12 +28,13 @@ def _G_solid_angle_integrand(R, H, X, varphi):
 def _H_solid_angle_integrand(R, H, X, varphi):
     x, y, z = X
 
-    R_varphi = x * np.cos(varphi) + y * np.sin(varphi)
+    d = x * np.cos(varphi) + y * np.sin(varphi)
+    r_varphi = -d + np.sqrt(d ** 2 - (x ** 2 + y ** 2 - R ** 2))
 
-    theta_min = (-R_varphi + np.sqrt(R_varphi ** 2 - (x ** 2 + y ** 2 - R ** 2))) / (H / 2.0 - z)
-    theta_max = (-R_varphi + np.sqrt(R_varphi ** 2 - (x ** 2 + y ** 2 - R ** 2))) / (-H / 2.0 - z)
+    theta_min = np.arctan(r_varphi / (H / 2.0 - z))
+    theta_max = np.arctan(r_varphi / (-H / 2.0 - z)) + np.pi
 
-    return np.cos(np.arctan(theta_min)) - np.cos(np.arctan(theta_max))
+    return np.cos(theta_min) - np.cos(theta_max)
 
 
 @jit
@@ -108,7 +110,6 @@ def single_dimensional_likelihood(R, H, rate, T, detections_i, detections_j, X, 
     joint_vmapped = vmap(compute_joint_probability, (None, 0, 0, None, None, None), 0)
     joint_evaluations = joint_vmapped(R, detections_i, detections_j, X, gamma, unifs)
 
-    # term_1 = np.sum(np.log(joint_evaluations))
     term_1 = np.sum(np.log(rate * T * joint_evaluations))
     term_2 = - rate * T * G_solid_angle_approx(R, H, X)
     return term_1 + term_2
@@ -118,31 +119,30 @@ def single_dimensional_likelihood(R, H, rate, T, detections_i, detections_j, X, 
 def single_dimensional_scattered_likelihood(R, H, n_cells, rate, T, detections_i, detections_j, X, scattering_dens,
                                             gamma, unifs):
     G_x = G_solid_angle_approx(R, H, X)
+    H_x = H_solid_angle_approx(R, H, X)
 
     # P(T,T) P(T, F) P(F, T) P(F, F)
     prob_s_1, prob_s_2, prob_s_3, prob_s_4 = scattering_dens
 
     # Case 1: Both Scattered
-    term_1 = prob_s_1 * (G_x / n_cells) ** 2
+    term_1 = prob_s_1 * (H_x / n_cells) ** 2
 
     # Case 2: T, F
-    marginal_j_vmapped = vmap(compute_i_marginal_probability, (None, 0, None), 0)
-    marginal_j_evaluations = marginal_j_vmapped(R, detections_j, X)
-    term_1 = term_1 + prob_s_2 * (G_x / n_cells) * marginal_j_evaluations
+    # marginal_j_vmapped = vmap(compute_j_marginal_probability, (None, 0, None), 0)
+    # marginal_j_evaluations = marginal_j_vmapped(R, detections_j, X)
+    # term_1 = term_1 + prob_s_2 * (H_x / n_cells) * marginal_j_evaluations
 
     # Case 3: F, T
-    marginal_i_vmapped = vmap(compute_i_marginal_probability, (None, 0, None), 0)
-    marginal_i_evaluations = marginal_i_vmapped(R, detections_i, X)
-    term_1 = term_1 + prob_s_3 * marginal_i_evaluations * (G_x / n_cells)
+    # marginal_i_vmapped = vmap(compute_i_marginal_probability, (None, 0, None), 0)
+    # marginal_i_evaluations = marginal_i_vmapped(R, detections_i, X)
+    # term_1 = term_1 + prob_s_3 * marginal_i_evaluations * (H_x / n_cells)
 
     # Case 4: Unscattered
     joint_vmapped = vmap(compute_joint_probability, (None, 0, 0, None, None, None), 0)
     joint_evaluations = joint_vmapped(R, detections_i, detections_j, X, gamma, unifs)
     term_1 = term_1 + prob_s_4 * joint_evaluations
 
-    term_1 = np.sum(np.log(rate * T * term_1))
-    term_2 = - rate * T * G_solid_angle_approx(R, H, X)
-    return term_1 + term_2
+    return np.sum(np.log(term_1)) - rate * T * G_x
 
 
 def lors_to_jax(d: CylinderDetector, lors: list):
@@ -169,13 +169,12 @@ def eval_single_dimensional_likelihood(d: CylinderDetector, activity: float, T: 
     R, H = d.dim_radius_cm, d.dim_height_cm
     n_cells = d.n_detector_cells()[0] * d.n_detector_cells()[1]
 
-
     if np.ndim(X) == 1:
         if scattering:
             scat_dens = scattering_density(R, X)
             return single_dimensional_scattered_likelihood(R=R, H=H, n_cells=n_cells, rate=activity, T=T,
                                                            detections_i=detections_i, detections_j=detections_j, X=X,
-                                                           scattering_density=scat_dens, gamma=gamma, unifs=unifs)
+                                                           scattering_dens=scat_dens, gamma=gamma, unifs=unifs)
         else:
             return single_dimensional_likelihood(R=R, H=H, rate=activity, T=T,
                                                  detections_i=detections_i, detections_j=detections_j, X=X,
@@ -210,6 +209,7 @@ def single_dimensional_likelihood_plot(d: CylinderDetector, activity: float, T: 
     vals = eval_single_dimensional_likelihood(d, activity, T, lors, gamma, np.array(points), scattering=True)
     for idx, (i, j) in enumerate(indices):
         img_1[i, j] = vals[idx]
+        # img_1[i, j] = points[idx][0]
 
     print('Sampled x-y plot')
 
@@ -228,6 +228,17 @@ def single_dimensional_likelihood_plot(d: CylinderDetector, activity: float, T: 
     ax2.set_xlabel('x'), ax2.set_ylabel('z')
 
     return fig, (ax1, ax2)
+
+
+def scattering_experiment_plot(d: CylinderDetector, p: StaticParticle, activity, T, gamma):
+    # Generate dataset
+    lors, scatters = p.simulate_emissions(detector=d, n_lor=int(T * activity))
+
+    # Eval likelihood over slices of detector
+    fig, ax = single_dimensional_likelihood_plot(d=d, activity=activity, T=T, gamma=gamma, lors=lors)
+    fig.suptitle(rf'Likelihood, particle={p.to_str_cartesian()}, scattering rate $\mu={p.scatter_rate}$')
+
+    return fig, ax
 
 
 def G_solid_angle_plot(beta_ratio):
@@ -273,18 +284,18 @@ if __name__ == '__main__':
     # Setup particle and set to no scattering
     det = CylinderDetector()
     p = StaticParticle()
-    p.set_position_cylindrical(r=0.1, theta=0.0, z=0.0)
-    p.set_position_cartesian(x=0.1, y=0.0, z=0.0)
+    # p.set_position_cylindrical(r=0.1, theta=0.0, z=0.1)
+    # p.set_position_cartesian(x=0.1, y=0.0, z=0.0)
     p.set_position_cartesian(x=0.0, y=0.1, z=0.0)
     p.scatter_rate = 3.0
     T, activity = 1.0, 10 ** 4
     X = np.array(p.get_position_cartesian())
 
     # Simulate Dataset
-    lors, scatters = p.simulate_emissions(detector=det, n_lor=int(T * activity))
-    print(f'Simulations finished, LoRs={len(lors)}, Scatters={scatters}')
-
-    args = {'d': det, 'activity': activity, 'T': T, 'gamma': 50.0, 'lors': lors}
+    # lors, scatters = p.simulate_emissions(detector=det, n_lor=int(T * activity))
+    # print(f'Simulations finished, LoRs={len(lors)}, Scatters={scatters}')
+    #
+    # args = {'d': det, 'activity': activity, 'T': T, 'gamma': 50.0, 'lors': lors}
 
     # print(eval_single_dimensional_likelihood(**args, X=X))
     # print(eval_single_dimensional_likelihood(**args, X=np.array([0.01, 0.0, 0.0])))
@@ -295,14 +306,6 @@ if __name__ == '__main__':
     # print(eval_single_dimensional_likelihood(**args, X=np.array([0.0, 0.0, -0.1])))
     # print(eval_single_dimensional_likelihood(**args, X=np.array([0.24, 0.0, 0.0])))
 
-    fig, _ = single_dimensional_likelihood_plot(**args)
-    fig.title(rf'Likelihood, scattering rate $\mu={args["activity"]}$')
+    fig, ax = scattering_experiment_plot(d=det, p=p, activity=activity, T=T, gamma=50.0)
     plt.savefig('figures/likelihood/scatter_1.png', format='png')
-
-    fig, _ = single_dimensional_likelihood_plot(**args)
-    fig.title(rf'Likelihood, scattering rate $\mu={args["activity"]}$')
-    plt.savefig('figures/likelihood/scatter_1.png', format='png')
-
-    fig, _ = single_dimensional_likelihood_plot(**args)
-    fig.title(rf'Likelihood, scattering rate $\mu={args["activity"]}$')
-    plt.savefig('figures/likelihood/scatter_1.png', format='png')
+    plt.show()

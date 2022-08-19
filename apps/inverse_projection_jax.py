@@ -2,14 +2,8 @@ import numpy as np
 import streamlit as st
 st.set_page_config(layout="wide")
 
-import matplotlib.pyplot as plt
-from matplotlib import patches
-
-from geometry import phi_proj, z_proj
-from integration import projection_region
 from jax_implementation import plot_proj_area
 from model import CylinderDetector, StaticParticle
-from plot import detector_plot
 
 d = CylinderDetector()
 R = d.dim_radius_cm
