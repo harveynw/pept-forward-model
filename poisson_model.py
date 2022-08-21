@@ -2,7 +2,7 @@ import jax.numpy as np
 import numpy as onp
 import matplotlib.pyplot as plt
 
-from jax import jit, vmap, random
+from jax import jit, vmap, random, grad
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from jax_implementation import compute_joint_probability, F_lambdas, compute_i_marginal_probability, \
@@ -128,14 +128,14 @@ def single_dimensional_scattered_likelihood(R, H, n_cells, rate, T, detections_i
     term_1 = prob_s_1 * (H_x / n_cells) ** 2
 
     # Case 2: T, F
-    # marginal_j_vmapped = vmap(compute_j_marginal_probability, (None, 0, None), 0)
-    # marginal_j_evaluations = marginal_j_vmapped(R, detections_j, X)
-    # term_1 = term_1 + prob_s_2 * (H_x / n_cells) * marginal_j_evaluations
+    marginal_j_vmapped = vmap(compute_j_marginal_probability, (None, 0, None), 0)
+    marginal_j_evaluations = marginal_j_vmapped(R, detections_j, X)
+    term_1 = term_1 + prob_s_2 * (H_x / n_cells) * marginal_j_evaluations
 
     # Case 3: F, T
-    # marginal_i_vmapped = vmap(compute_i_marginal_probability, (None, 0, None), 0)
-    # marginal_i_evaluations = marginal_i_vmapped(R, detections_i, X)
-    # term_1 = term_1 + prob_s_3 * marginal_i_evaluations * (H_x / n_cells)
+    marginal_i_vmapped = vmap(compute_i_marginal_probability, (None, 0, None), 0)
+    marginal_i_evaluations = marginal_i_vmapped(R, detections_i, X)
+    term_1 = term_1 + prob_s_3 * marginal_i_evaluations * (H_x / n_cells)
 
     # Case 4: Unscattered
     joint_vmapped = vmap(compute_joint_probability, (None, 0, 0, None, None, None), 0)
@@ -143,6 +143,12 @@ def single_dimensional_scattered_likelihood(R, H, n_cells, rate, T, detections_i
     term_1 = term_1 + prob_s_4 * joint_evaluations
 
     return np.sum(np.log(term_1)) - rate * T * G_x
+
+@jit
+def single_dimensional_scattered_likelihood_grad(R, H, n_cells, rate, T, detections_i, detections_j, X, scattering_dens,
+                                                 gamma, unifs):
+    return grad(single_dimensional_scattered_likelihood, 7)(R, H, n_cells, rate, T, detections_i, detections_j, X, scattering_dens,
+                                                            gamma, unifs)
 
 
 def lors_to_jax(d: CylinderDetector, lors: list):
@@ -159,7 +165,7 @@ def lors_to_jax(d: CylinderDetector, lors: list):
 
 
 def eval_single_dimensional_likelihood(d: CylinderDetector, activity: float, T: float, lors: list, gamma: float,
-                                       X: np.array, scattering=False):
+                                       X: np.array, scattering=False, gradient=False):
     # Uniform samples on [0,1] x [0,1] for estimating integral
     key = random.PRNGKey(0)
     unifs = random.uniform(key=key, shape=(5, 2))
@@ -172,7 +178,12 @@ def eval_single_dimensional_likelihood(d: CylinderDetector, activity: float, T: 
     if np.ndim(X) == 1:
         if scattering:
             scat_dens = scattering_density(R, X)
-            return single_dimensional_scattered_likelihood(R=R, H=H, n_cells=n_cells, rate=activity, T=T,
+            if gradient:
+                return single_dimensional_scattered_likelihood_grad(R=R, H=H, n_cells=n_cells, rate=activity, T=T,
+                                                               detections_i=detections_i, detections_j=detections_j, X=X,
+                                                               scattering_dens=scat_dens, gamma=gamma, unifs=unifs)
+            else:
+                return single_dimensional_scattered_likelihood(R=R, H=H, n_cells=n_cells, rate=activity, T=T,
                                                            detections_i=detections_i, detections_j=detections_j, X=X,
                                                            scattering_dens=scat_dens, gamma=gamma, unifs=unifs)
         else:
