@@ -4,7 +4,7 @@ import jax.numpy as np
 import matplotlib.pyplot as plt
 
 from model import CylinderDetector, StaticParticle
-from poisson_model import eval_single_dimensional_likelihood
+from inversion.inference import create_likelihood
 
 d = CylinderDetector()
 p = StaticParticle()
@@ -15,21 +15,16 @@ lors, scatters = p.simulate_emissions(detector=d, n_lor=int(T * activity))
 X_actual = np.array(p.get_position_cartesian())
 print('Sim done')
 
-likelihood = lambda x: eval_single_dimensional_likelihood(d=d,
-                                                          activity=activity,
-                                                          T=T,
-                                                          lors=lors,
-                                                          gamma=50.0,
-                                                          X=x,
-                                                          scattering=True)
-gradient = lambda x: eval_single_dimensional_likelihood(d=d,
-                                                        activity=activity,
-                                                        T=T,
-                                                        lors=lors,
-                                                        gamma=50.0,
-                                                        X=x,
-                                                        scattering=True,
-                                                        gradient=True)
+likelihood = create_likelihood(d, activity, T, lors, 50.0, mc_samples=5, mapped=False)
+
+# gradient = lambda x: eval_single_dimensional_likelihood(d=d,
+#                                                         activity=activity,
+#                                                         T=T,
+#                                                         lors=lors,
+#                                                         gamma=50.0,
+#                                                         X=x,
+#                                                         scattering=True,
+#                                                         gradient=True)
 
 
 def grad_fd(x):

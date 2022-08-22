@@ -19,40 +19,44 @@ def atan2(y, x):
     return np.where(angle > 0.0, angle, 2 * np.pi + angle)
 
 
-def F_lambdas_hat(R, varphi, x, y):
+def F_lambdas_hat(R, varphi, X):
+    x, y, _ = X
     c_1 = x * np.cos(varphi) + y * np.sin(varphi)
     c_2 = np.sqrt(c_1 ** 2 - (x ** 2 + y ** 2 - R ** 2))
     return -c_1 + c_2, -c_1 - c_2
 
 
-def F_lambdas(R, varphi, theta, x, y):
-    l_1_hat, l_2_hat = F_lambdas_hat(R, varphi, x, y)
+def F_lambdas(R, varphi, theta, X):
+    l_1_hat, l_2_hat = F_lambdas_hat(R, varphi, X)
     return 1.0/np.sin(theta) * l_1_hat, 1.0/np.sin(theta) * l_2_hat
 
 
-def F_phi_1(R, varphi, x, y):
-    l_1, _ = F_lambdas_hat(R, varphi, x, y)
+def F_phi_1(R, varphi, X):
+    x, y, _ = X
+    l_1, _ = F_lambdas_hat(R, varphi, X)
     return atan2(y + l_1 * np.sin(varphi), x + l_1 * np.cos(varphi))
 
 
-def F_phi_2(R, varphi, x, y):
-    _, l_2 = F_lambdas_hat(R, varphi, x, y)
+def F_phi_2(R, varphi, X):
+    x, y, _ = X
+    _, l_2 = F_lambdas_hat(R, varphi, X)
     return atan2(y + l_2 * np.sin(varphi), x + l_2 * np.cos(varphi))
 
 
 def F_z_1(R, varphi, theta, X):
     x, y, z = X
-    l_1, _ = F_lambdas_hat(R, varphi, x, y)
+    l_1, _ = F_lambdas_hat(R, varphi, X)
     return z + l_1 * np.cos(theta) / np.sin(theta)
 
 
 def F_z_2(R, varphi, theta, X):
-    x, y, z = X
-    _, l_2 = F_lambdas_hat(R, varphi, x, y)
+    _, _, z = X
+    _, l_2 = F_lambdas_hat(R, varphi, X)
     return z + l_2 * np.cos(theta) / np.sin(theta)
 
 
-def G_phi(R, phi_1, x, y):
+def G_phi(R, phi_1, X):
+    x, y, z = X
     c_x, c_y = x - R * np.cos(phi_1), y - R * np.sin(phi_1)
     omega = -2 * R * (np.cos(phi_1) * c_x + np.sin(phi_1) * c_y) / (c_x ** 2 + c_y ** 2)
     return atan2(R * np.sin(phi_1) + omega * c_y, R * np.cos(phi_1) + omega * c_x)
@@ -87,16 +91,16 @@ def G_varphi_theta_2(R, phi_2, z_2, X):
     return varphi, theta
 
 
-def jacobian_phi_1(R, varphi, x, y):
-    return 1.0 / np.abs(grad(F_phi_1, 1)(R, varphi, x, y))
+def jacobian_phi_1(R, varphi, X):
+    return 1.0 / np.abs(grad(F_phi_1, 1)(R, varphi, X))
 
 
 def jacobian_z_1(R, varphi, theta, X):
     return 1.0 / np.abs(grad(F_z_1, 2)(R, varphi, theta, X))
 
 
-def jacobian_phi_2(R, varphi, x, y):
-    return 1.0 / np.abs(grad(F_phi_2, 1)(R, varphi, x, y))
+def jacobian_phi_2(R, varphi, X):
+    return 1.0 / np.abs(grad(F_phi_2, 1)(R, varphi, X))
 
 
 def jacobian_z_2(R, varphi, theta, X):
@@ -113,8 +117,7 @@ def smaller_than(x, threshold, gamma):
 
 def detector_proj(R, min_phi, max_phi, min_z, max_z, X):
     # Clockwise
-    x, y, _ = X
-    return G_phi(R, max_phi, x, y), G_phi(R, min_phi, x, y), \
+    return G_phi(R, max_phi, X), G_phi(R, min_phi, X), \
            G_z(R, max_phi, max_z, X), G_z(R, max_phi, min_z, X), \
            G_z(R, min_phi, min_z, X), G_z(R, min_phi, max_z, X)
 
@@ -122,8 +125,7 @@ def detector_proj(R, min_phi, max_phi, min_z, max_z, X):
 def characteristic_function(R, detector_j, phi_1, z_1, X, gamma):
     j_phi_min, j_z_min, d_phi, d_z = detector_j
 
-    x, y, _ = X
-    phi_2, z_2 = G_phi(R, phi_1, x, y), G_z(R, phi_1, z_1, X)
+    phi_2, z_2 = G_phi(R, phi_1, X), G_z(R, phi_1, z_1, X)
 
     cond_1 = greater_than(phi_2, j_phi_min, gamma)
     cond_2 = smaller_than(phi_2, j_phi_min + d_phi, gamma)
@@ -144,29 +146,26 @@ def evaluate_joint_integrand(R, sample_point, detector_j, X, gamma):
     char = characteristic_function(R=R, detector_j=detector_j, phi_1=phi_1, z_1=z_1, X=X, gamma=gamma)
 
     # Other parts of integrand
-    x, y, _ = X
     varphi, theta = G_varphi_theta_1(R, phi_1, z_1, X)
-    j_1 = jacobian_phi_1(R, varphi, x, y)
+    j_1 = jacobian_phi_1(R, varphi, X)
     j_2 = jacobian_z_1(R, varphi, theta, X)
 
     return (1 / (2 * np.pi)) * char * np.sin(theta) * j_1 * j_2
 
 
 def evaluate_i_integrand(R, sample_point, X):
-    x, y, _ = X
     phi_1, z_1 = sample_point
     varphi, theta = G_varphi_theta_1(R, phi_1, z_1, X)
-    j_1 = jacobian_phi_1(R, varphi, x, y)
+    j_1 = jacobian_phi_1(R, varphi, X)
     j_2 = jacobian_z_1(R, varphi, theta, X)
 
     return (1 / (2 * np.pi)) * np.sin(theta) * j_1 * j_2
 
 
 def evaluate_j_integrand(R, sample_point, X):
-    x, y, _ = X
     phi_2, z_2 = sample_point
     varphi, theta = G_varphi_theta_2(R, phi_2, z_2, X)
-    j_1 = jacobian_phi_2(R, varphi, x, y)
+    j_1 = jacobian_phi_2(R, varphi, X)
     j_2 = jacobian_z_2(R, varphi, theta, X)
 
     return (1 / (2 * np.pi)) * np.sin(theta) * j_1 * j_2
@@ -208,9 +207,8 @@ def compute_joint_probability_v2(R, detector_i: tuple, detector_j: tuple, X: np.
     char = 1.0/n_samples * np.sum(vmap_characteristic(R, detector_j, sample_points[:, 0], sample_points[:, 1], X, gamma))
 
     # Other parts of integrand
-    x, y, _ = X
     varphi, theta = G_varphi_theta_1(R, i_phi_min+d_phi/2.0, i_z_min+d_z/2.0, X)
-    j_1 = jacobian_phi_1(R, varphi, x, y)
+    j_1 = jacobian_phi_1(R, varphi, X)
     j_2 = jacobian_z_1(R, varphi, theta, X)
 
     V = d_phi * d_z
@@ -297,7 +295,7 @@ def plot_proj_area(min_phi=np.pi / 2 - 0.05, max_phi=np.pi / 2 + 0.05, min_z=0.2
     return fig, ax
 
 
-def plot_marginal(X=None, gamma=50):
+def plot_marginal(X=None, gamma=200):
     if X is None:
         X = np.array([0.0, 0.0, 0.0])
     else:
@@ -313,10 +311,10 @@ def plot_marginal(X=None, gamma=50):
     detectors = np.array([list(quad.min()) + [d_phi, d_z] for quad in detector_quads])
 
     key = random.PRNGKey(0)
-    unifs = random.uniform(key=key, shape=(5, 2))
+    unifs = random.uniform(key=key, shape=(25, 2))
 
-    marginal_mapped = jit(vmap(compute_marginal_probability_v2, in_axes=(None, 0, None, None, None, None), out_axes=0))
-    # marginal_mapped = jit(vmap(compute_marginal_probability, in_axes=(None, 0, None, None, None, None), out_axes=0))
+    # marginal_mapped = jit(vmap(compute_marginal_probability_v2, in_axes=(None, 0, None, None, None, None), out_axes=0))
+    marginal_mapped = jit(vmap(compute_marginal_probability, in_axes=(None, 0, None, None, None, None), out_axes=0))
 
     print('Evaluating marginal over entire detector')
     vals = marginal_mapped(d.dim_radius_cm, detectors, detectors, X, gamma, unifs)

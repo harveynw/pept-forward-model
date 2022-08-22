@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 # State type can be any object/number
 from model import CylinderDetector, StaticParticle
-from poisson_model import eval_single_dimensional_likelihood
+from inversion.inference import eval_single_dimensional_likelihood
 
 State = Any
 
