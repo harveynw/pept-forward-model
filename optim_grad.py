@@ -15,7 +15,7 @@ lors, scatters = p.simulate_emissions(detector=d, n_lor=int(T * activity))
 X_actual = np.array(p.get_position_cartesian())
 print('Sim done')
 
-likelihood = create_likelihood(d, activity, T, lors, 50.0, mc_samples=5, mapped=False)
+likelihood, gradient = create_likelihood(d, activity, T, lors, 50.0, mc_samples=5, mapped=False)
 
 # gradient = lambda x: eval_single_dimensional_likelihood(d=d,
 #                                                         activity=activity,
@@ -48,11 +48,13 @@ X = np.array([0.0, 0.0, 0.0])
 nu = 0.05
 
 likelihood_history = []
-n_iters = 20
+n_iters = 100
 for iter in range(n_iters):
     g = grad_fd(X)
     g = g / jax.numpy.linalg.norm(g)
-    print('X', X, 'Grad', g)
+    exact_g = gradient(X)
+    exact_g = exact_g / jax.numpy.linalg.norm(exact_g)
+    print('X', X, 'Grad', g, 'Exact gradient', exact_g)
     X = X + nu * (1 - iter/n_iters) * g
     likelihood_history.append(jax.numpy.linalg.norm(X_actual - X))
 

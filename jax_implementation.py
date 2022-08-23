@@ -57,15 +57,15 @@ def F_z_2(R, varphi, theta, X):
 
 def G_phi(R, phi_1, X):
     x, y, z = X
-    c_x, c_y = x - R * np.cos(phi_1), y - R * np.sin(phi_1)
-    omega = -2 * R * (np.cos(phi_1) * c_x + np.sin(phi_1) * c_y) / (c_x ** 2 + c_y ** 2)
-    return atan2(R * np.sin(phi_1) + omega * c_y, R * np.cos(phi_1) + omega * c_x)
+    R_x, R_y = x - R * np.cos(phi_1), y - R * np.sin(phi_1)
+    omega = -2 * (R_x * R * np.cos(phi_1) + R_y * R * np.sin(phi_1)) / (R_x ** 2 + R_y ** 2)
+    return atan2(R * np.sin(phi_1) + omega * R_y, R * np.cos(phi_1) + omega * R_x)
 
 
 def G_z(R, phi_1, z_1, X):
     x, y, z = X
-    c_x, c_y = x - R * np.cos(phi_1), y - R * np.sin(phi_1)
-    omega = -2 * R * (np.cos(phi_1) * c_x + np.sin(phi_1) * c_y) / (c_x ** 2 + c_y ** 2)
+    R_x, R_y = x - R * np.cos(phi_1), y - R * np.sin(phi_1)
+    omega = -2 * (R_x * R * np.cos(phi_1) + R_y * R * np.sin(phi_1)) / (R_x ** 2 + R_y ** 2)
     return z_1 + omega * (z - z_1)
 
 

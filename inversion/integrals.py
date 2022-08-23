@@ -56,7 +56,6 @@ def G_integral(R, H, X):
 @jit
 def _scattering_density_integrand(R, varphi, theta, X):
     mu = 3.0
-    x, y, z = X
     l_1, l_2 = F_lambdas(R, varphi, theta, X)
     e_1, e_2 = np.exp(-mu * l_1), np.exp(mu * l_2)
 

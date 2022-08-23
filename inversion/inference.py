@@ -1,10 +1,9 @@
 import jax.numpy as np
-import matplotlib.pyplot as plt
 
 from jax import jit, vmap, random, grad
 from inversion.integrals import scattering_density
 from inversion.poisson_likelihood import single_dimensional_scattered_likelihood, single_dimensional_likelihood
-from model import CylinderDetector, StaticParticle
+from model import CylinderDetector
 
 @jit
 def single_dimensional_scattered_likelihood_grad(R, H, n_cells, rate, T, detections_i, detections_j, X, scattering_dens,
@@ -28,7 +27,7 @@ def encode_lors(d: CylinderDetector, lors: list):
 
 
 def create_likelihood(d, activity, T, lors, gamma, mc_samples=5, mapped=True):
-    # Returns a closure that evaluates the likelihood for a given X (or X's)
+    # Returns a closure that evaluates the likelihood (and the gradient) for a given X (or X's)
 
     # Uniform samples on [0,1] x [0,1] for estimating integrals
     key = random.PRNGKey(0)
@@ -42,16 +41,21 @@ def create_likelihood(d, activity, T, lors, gamma, mc_samples=5, mapped=True):
     # Construct likelihood closure
     scat_dens_f = scattering_density
     likelihood_f = single_dimensional_scattered_likelihood
+    gradient_f = jit(grad(single_dimensional_scattered_likelihood, 7))
     if mapped:
         scat_dens_f = jit(vmap(scat_dens_f, (None, 0), 0))
         likelihood_f = jit(vmap(likelihood_f, [None] * 7 + [0, 0] + [None] * 2, 0))
+        gradient_f = lambda *args: None  # Not needed yet
 
     def likelihood(X):
         scat_dens = scat_dens_f(R, X)
-        return likelihood_f(R, H, n_cells, activity, T, detections_i, detections_j, X, scat_dens,
-                            gamma, unifs)
+        return likelihood_f(R, H, n_cells, activity, T, detections_i, detections_j, X, scat_dens, gamma, unifs)
 
-    return likelihood
+    def gradient(X):
+        scat_dens = scat_dens_f(R, X)
+        return gradient_f(R, H, n_cells, activity, T, detections_i, detections_j, X, scat_dens, gamma, unifs)
+
+    return likelihood, gradient
 
 
 def eval_single_dimensional_likelihood(d: CylinderDetector, activity: float, T: float, lors: list, gamma: float,
@@ -93,36 +97,3 @@ def eval_single_dimensional_likelihood(d: CylinderDetector, activity: float, T: 
             likelihood_mapped = jit(vmap(single_dimensional_likelihood,
                                          (None, None, None, None, None, None, 0, None, None), 0))
             return likelihood_mapped(R, H, activity, T, detections_i, detections_j, X, gamma, unifs)
-
-
-if __name__ == '__main__':
-    # d = CylinderDetector()
-    #
-    # fig, ax = G_solid_angle_plot(beta_ratio=1.0)
-    # plt.show()
-    #
-    # fig, ax = G_solid_angle_plot(beta_ratio=0.5)
-    # plt.show()
-    #
-    # fig, ax = G_solid_angle_plot(beta_ratio=0.25)
-    # plt.show()
-
-    # Setup particle and set to no scattering
-    det = CylinderDetector()
-    p = StaticParticle()
-    # p.set_position_cylindrical(r=0.1, theta=0.0, z=0.1)
-    # p.set_position_cartesian(x=0.1, y=0.0, z=0.0)
-    p.set_position_cartesian(x=0.0, y=0.1, z=0.0)
-    p.scatter_rate = 3.0
-    T, activity = 1.0, 10 ** 4
-    X = np.array(p.get_position_cartesian())
-
-    # Simulate Dataset
-    # lors, scatters = p.simulate_emissions(detector=det, n_lor=int(T * activity))
-    # print(f'Simulations finished, LoRs={len(lors)}, Scatters={scatters}')
-    #
-    # args = {'d': det, 'activity': activity, 'T': T, 'gamma': 50.0, 'lors': lors}
-
-    # fig, ax = scattering_experiment_plot(d=det, p=p, activity=activity, T=T, gamma=50.0)
-    # plt.savefig('figures/likelihood/scatter_1.png', format='png')
-    # plt.show()
