@@ -18,6 +18,10 @@ def single_dimensional_likelihood(R, H, rate, T, detections_i, detections_j, X, 
 @jit
 def single_dimensional_scattered_likelihood(R, H, n_cells, rate, T, detections_i, detections_j, X, scattering_dens,
                                             gamma, unifs):
+    # TODO: A hotfix
+    x_comp, y_comp, z_comp = X
+    X = np.array([y_comp, x_comp, z_comp])
+
     G_x = G_integral(R, H, X)
     H_x = H_integral(R, H, X)
 
