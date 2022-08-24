@@ -337,17 +337,17 @@ def plot_marginal(X=None, gamma=200):
 if __name__ == '__main__':
     #  Marginal Example Plots
 
-    plot_marginal()
-    plt.savefig('figures/comparison/marginal_1.eps', format='eps', bbox_inches='tight')
-    plt.show()
+    # plot_marginal()
+    # plt.savefig('figures/comparison/marginal_1.eps', format='eps', bbox_inches='tight')
+    # plt.savefig('figures/comparison/marginal_1.png', format='png', bbox_inches='tight')
 
-    plot_marginal(X=[0.1, 0.1, 0.0])
-    plt.savefig('figures/comparison/marginal_2.eps', format='eps', bbox_inches='tight')
-    plt.show()
+    # plot_marginal(X=[0.1, 0.1, 0.0])
+    # plt.savefig('figures/comparison/marginal_2.eps', format='eps', bbox_inches='tight')
+    # plt.savefig('figures/comparison/marginal_2.png', format='png', bbox_inches='tight')
 
-    plot_marginal(X=[0.1, 0.1, 0.4])
+    plot_marginal(X=[0.1, 0.1, 0.18])
     plt.savefig('figures/comparison/marginal_3.eps', format='eps', bbox_inches='tight')
-    plt.show()
+    plt.savefig('figures/comparison/marginal_3.png', format='png', bbox_inches='tight')
 
     # #  Gradient eval on joint test
     # d = CylinderDetector()

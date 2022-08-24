@@ -52,6 +52,7 @@ for iter in range(n_iters):
 
 plt.plot(onp.arange(stop=n_iters), likelihood_history)
 plt.title(rf'Gradient Ascent Error starting at origin, real position {p.to_str_cartesian()}')
+plt.savefig('figures/likelihood/gradient_ascent.png', format='png')
 plt.show()
 
 

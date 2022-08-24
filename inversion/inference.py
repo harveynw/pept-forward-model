@@ -5,12 +5,6 @@ from inversion.integrals import scattering_density
 from inversion.poisson_likelihood import single_dimensional_scattered_likelihood, single_dimensional_likelihood
 from model import CylinderDetector
 
-@jit
-def single_dimensional_scattered_likelihood_grad(R, H, n_cells, rate, T, detections_i, detections_j, X, scattering_dens,
-                                                 gamma, unifs):
-    return grad(single_dimensional_scattered_likelihood, 7)(R, H, n_cells, rate, T, detections_i, detections_j, X, scattering_dens,
-                                                            gamma, unifs)
-
 
 def encode_lors(d: CylinderDetector, lors: list):
     # Converts list of LoRs to a JAX array

@@ -3,7 +3,7 @@ import numpy as onp
 import matplotlib.pyplot as plt
 
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from inversion.inference import eval_single_dimensional_likelihood, create_likelihood
+from inversion.inference import create_likelihood
 from inversion.integrals import G_integral
 from model import CylinderDetector, StaticParticle
 
@@ -105,12 +105,20 @@ if __name__ == '__main__':
     T, activity = 1.0, 10 ** 4
     X = np.array(p.get_position_cartesian())
 
-    # Simulate Dataset
-    # lors, scatters = p.simulate_emissions(detector=det, n_lor=int(T * activity))
-    # print(f'Simulations finished, LoRs={len(lors)}, Scatters={scatters}')
-    #
-    # args = {'d': det, 'activity': activity, 'T': T, 'gamma': 50.0, 'lors': lors}
-
+    p.scatter_rate = 8.0
     fig, ax = scattering_experiment_plot(d=det, p=p, activity=activity, T=T, gamma=50.0)
-    plt.savefig('figures/likelihood/scatter_2.png', format='png')
-    plt.show()
+    plt.savefig('figures/likelihood/scatter_3.png', format='png')
+    # plt.show()
+
+    p.set_position_cartesian(0.1, 0.1, 0.0)
+    p.scatter_rate = 0.5
+    fig, ax = scattering_experiment_plot(d=det, p=p, activity=activity, T=T, gamma=50.0)
+    plt.savefig('figures/likelihood/scatter_x_1.png', format='png')
+
+    p.scatter_rate = 3.0
+    fig, ax = scattering_experiment_plot(d=det, p=p, activity=activity, T=T, gamma=50.0)
+    plt.savefig('figures/likelihood/scatter_x_2.png', format='png')
+
+    p.scatter_rate = 8.0
+    fig, ax = scattering_experiment_plot(d=det, p=p, activity=activity, T=T, gamma=50.0)
+    plt.savefig('figures/likelihood/scatter_x_3.png', format='png')
