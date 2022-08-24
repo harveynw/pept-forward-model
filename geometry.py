@@ -259,6 +259,15 @@ def z_proj(R: float, X: np.ndarray, phi: float, z: float) -> float:
     return z + omega*(X[2]-z)
 
 
+def random_point_within_cylinder(radius, height):
+    # Random point within cylinder with center at the origin
+    z = np.random.uniform(-height/2.0, height/2.0)
+    while True:
+        x, y = np.random.uniform(-radius, radius), np.random.uniform(-radius, radius)
+        if np.sqrt(x**2 + y**2) < radius:
+            return np.array([x, y, z])
+
+
 if __name__ == '__main__':
     # Some testing
 

@@ -45,7 +45,7 @@ def create_likelihood(d, activity, T, lors, gamma, mc_samples=5, mapped=True):
     if mapped:
         scat_dens_f = jit(vmap(scat_dens_f, (None, 0), 0))
         likelihood_f = jit(vmap(likelihood_f, [None] * 7 + [0, 0] + [None] * 2, 0))
-        gradient_f = lambda *args: None  # Not needed yet
+        gradient_f = jit(vmap(gradient_f, [None] * 7 + [0, 0] + [None] * 2, 0))
 
     def likelihood(X):
         scat_dens = scat_dens_f(R, X)
