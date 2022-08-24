@@ -54,8 +54,7 @@ def G_integral(R, H, X):
 
 
 @jit
-def _scattering_density_integrand(R, varphi, theta, X):
-    mu = 3.0
+def _scattering_density_integrand(R, varphi, theta, mu, X):
     l_1, l_2 = F_lambdas(R, varphi, theta, X)
     e_1, e_2 = np.exp(-mu * l_1), np.exp(mu * l_2)
 
@@ -68,18 +67,18 @@ def _scattering_density_integrand(R, varphi, theta, X):
 
 
 @jit
-def _scattering_density_inner_integral(R, varphi, thetas, X):
-    integrand_vmap = vmap(_scattering_density_integrand, (None, None, 0, None), 0)
+def _scattering_density_inner_integral(R, varphi, thetas, mu, X):
+    integrand_vmap = vmap(_scattering_density_integrand, (None, None, 0, None, None), 0)
 
-    f_x_inner = np.sum(integrand_vmap(R, varphi, thetas, X), axis=0)
-    f_x_0 = _scattering_density_integrand(R, varphi, 0.0, X)
-    f_x_N = _scattering_density_integrand(R, varphi, np.pi / 2, X)
+    f_x_inner = np.sum(integrand_vmap(R, varphi, thetas, mu, X), axis=0)
+    f_x_0 = _scattering_density_integrand(R, varphi, 0.0, mu, X)
+    f_x_N = _scattering_density_integrand(R, varphi, np.pi / 2, mu, X)
 
     return f_x_0 + 2 * f_x_inner + f_x_N
 
 
 @jit
-def scattering_density(R, X):
+def scattering_density(R, mu, X):
     # Returns a 4-dim vector for the probability of each possible value of S = [S_1, S_2]
     # Numericallly integrated by double application of trapezium rule
 
@@ -89,10 +88,10 @@ def scattering_density(R, X):
     d_theta = (np.pi / 2) / 100
     thetas = np.arange(start=d_theta, stop=np.pi / 2, step=d_theta)
 
-    integrand_vmap = vmap(_scattering_density_inner_integral, (None, 0, None, None), 0)
+    integrand_vmap = vmap(_scattering_density_inner_integral, (None, 0, None, None, None), 0)
 
-    f_x_inner = np.sum(integrand_vmap(R, varphis, thetas, X), axis=0)
-    f_x_0 = _scattering_density_inner_integral(R, 0.0, thetas, X)
-    f_x_N = _scattering_density_inner_integral(R, 2 * np.pi, thetas, X)
+    f_x_inner = np.sum(integrand_vmap(R, varphis, thetas, mu, X), axis=0)
+    f_x_0 = _scattering_density_inner_integral(R, 0.0, thetas, mu, X)
+    f_x_N = _scattering_density_inner_integral(R, 2 * np.pi, thetas, mu, X)
 
     return d_varphi / 2.0 * d_theta / 2.0 * (f_x_0 + 2 * f_x_inner + f_x_N)

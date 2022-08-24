@@ -15,16 +15,7 @@ lors, scatters = p.simulate_emissions(detector=d, n_lor=int(T * activity))
 X_actual = np.array(p.get_position_cartesian())
 print('Sim done')
 
-likelihood, gradient = create_likelihood(d, activity, T, lors, 50.0, mc_samples=5, mapped=False)
-
-# gradient = lambda x: eval_single_dimensional_likelihood(d=d,
-#                                                         activity=activity,
-#                                                         T=T,
-#                                                         lors=lors,
-#                                                         gamma=50.0,
-#                                                         X=x,
-#                                                         scattering=True,
-#                                                         gradient=True)
+likelihood, gradient = create_likelihood(d, activity, T, lors, 50.0, p.scatter_rate, mc_samples=5, mapped=False)
 
 
 def grad_fd(x):
@@ -58,7 +49,9 @@ for iter in range(n_iters):
     X = X + nu * (1 - iter/n_iters) * g
     likelihood_history.append(jax.numpy.linalg.norm(X_actual - X))
 
+
 plt.plot(onp.arange(stop=n_iters), likelihood_history)
+plt.title(rf'Gradient Ascent Error starting at origin, real position {p.to_str_cartesian()}')
 plt.show()
 
 

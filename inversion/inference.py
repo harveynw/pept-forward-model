@@ -26,7 +26,7 @@ def encode_lors(d: CylinderDetector, lors: list):
     return detections_i, detections_j
 
 
-def create_likelihood(d, activity, T, lors, gamma, mc_samples=5, mapped=True):
+def create_likelihood(d, activity, T, lors, gamma, mu, mc_samples=5, mapped=True):
     # Returns a closure that evaluates the likelihood (and the gradient) for a given X (or X's)
 
     # Uniform samples on [0,1] x [0,1] for estimating integrals
@@ -43,57 +43,16 @@ def create_likelihood(d, activity, T, lors, gamma, mc_samples=5, mapped=True):
     likelihood_f = single_dimensional_scattered_likelihood
     gradient_f = jit(grad(single_dimensional_scattered_likelihood, 7))
     if mapped:
-        scat_dens_f = jit(vmap(scat_dens_f, (None, 0), 0))
+        scat_dens_f = jit(vmap(scat_dens_f, (None, None, 0), 0))
         likelihood_f = jit(vmap(likelihood_f, [None] * 7 + [0, 0] + [None] * 2, 0))
         gradient_f = jit(vmap(gradient_f, [None] * 7 + [0, 0] + [None] * 2, 0))
 
     def likelihood(X):
-        scat_dens = scat_dens_f(R, X)
+        scat_dens = scat_dens_f(R, mu, X)
         return likelihood_f(R, H, n_cells, activity, T, detections_i, detections_j, X, scat_dens, gamma, unifs)
 
     def gradient(X):
-        scat_dens = scat_dens_f(R, X)
+        scat_dens = scat_dens_f(R, mu, X)
         return gradient_f(R, H, n_cells, activity, T, detections_i, detections_j, X, scat_dens, gamma, unifs)
 
     return likelihood, gradient
-
-
-def eval_single_dimensional_likelihood(d: CylinderDetector, activity: float, T: float, lors: list, gamma: float,
-                                       X: np.array, scattering=False, gradient=False):
-    # Uniform samples on [0,1] x [0,1] for estimating integral
-    key = random.PRNGKey(0)
-    unifs = random.uniform(key=key, shape=(5, 2))
-
-    # Collecting LoRs into JAX Arrays
-    detections_i, detections_j = encode_lors(d, lors)
-    R, H = d.dim_radius_cm, d.dim_height_cm
-    n_cells = d.n_detector_cells()[0] * d.n_detector_cells()[1]
-
-    if np.ndim(X) == 1:
-        if scattering:
-            scat_dens = scattering_density(R, X)
-            if gradient:
-                return single_dimensional_scattered_likelihood_grad(R=R, H=H, n_cells=n_cells, rate=activity, T=T,
-                                                               detections_i=detections_i, detections_j=detections_j, X=X,
-                                                               scattering_dens=scat_dens, gamma=gamma, unifs=unifs)
-            else:
-                return single_dimensional_scattered_likelihood(R=R, H=H, n_cells=n_cells, rate=activity, T=T,
-                                                           detections_i=detections_i, detections_j=detections_j, X=X,
-                                                           scattering_dens=scat_dens, gamma=gamma, unifs=unifs)
-        else:
-            return single_dimensional_likelihood(R=R, H=H, rate=activity, T=T,
-                                                 detections_i=detections_i, detections_j=detections_j, X=X,
-                                                 gamma=gamma, unifs=unifs)
-    else:
-        if scattering:
-            scattering_mapped = jit(vmap(scattering_density, (None, 0), 0))
-            scat_dens_eval = scattering_mapped(R, X)
-            likelihood_mapped = jit(vmap(single_dimensional_scattered_likelihood,
-                                         (None, None, None, None, None, None, None, 0, 0, None, None), 0))
-            return likelihood_mapped(R, H, n_cells, activity, T, detections_i, detections_j, X, scat_dens_eval,
-                                     gamma, unifs)
-        else:
-            # Vmap case
-            likelihood_mapped = jit(vmap(single_dimensional_likelihood,
-                                         (None, None, None, None, None, None, 0, None, None), 0))
-            return likelihood_mapped(R, H, activity, T, detections_i, detections_j, X, gamma, unifs)

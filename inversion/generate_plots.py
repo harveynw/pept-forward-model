@@ -3,7 +3,7 @@ import numpy as onp
 import matplotlib.pyplot as plt
 
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from inversion.inference import eval_single_dimensional_likelihood
+from inversion.inference import eval_single_dimensional_likelihood, create_likelihood
 from inversion.integrals import G_integral
 from model import CylinderDetector, StaticParticle
 
@@ -34,8 +34,10 @@ def G_solid_angle_plot(beta_ratio):
     return fig, ax
 
 
-def single_dimensional_likelihood_plot(d: CylinderDetector, activity: float, T: float, lors: list, gamma: float):
+def single_dimensional_likelihood_plot(d: CylinderDetector, activity: float, T: float, lors: list, gamma: float, mu: float):
     fig, (ax1, ax2) = plt.subplots(ncols=2)
+
+    likelihood, _ = create_likelihood(d, activity, T, lors, gamma, mu, mc_samples=5, mapped=True)
 
     R, H = d.dim_radius_cm, d.dim_height_cm
     n_samps = 100
@@ -46,7 +48,7 @@ def single_dimensional_likelihood_plot(d: CylinderDetector, activity: float, T: 
     # Plotting over (x, y, z=0.0)
     points = [[x_s + d_x / 2, y_s + d_y / 2, 0.0] for x_s in x for y_s in y if onp.sqrt(x_s ** 2 + y_s ** 2) < R]
     indices = [[i, j] for i, x_s in enumerate(x) for j, y_s in enumerate(y) if onp.sqrt(x_s ** 2 + y_s ** 2) < R]
-    vals = eval_single_dimensional_likelihood(d, activity, T, lors, gamma, np.array(points), scattering=True)
+    vals = likelihood(np.array(points))
     for idx, (i, j) in enumerate(indices):
         img_1[i, j] = vals[idx]
         # img_1[i, j] = points[idx][0]
@@ -56,7 +58,7 @@ def single_dimensional_likelihood_plot(d: CylinderDetector, activity: float, T: 
     # Plotting over (x, y=0.0, z)
     points = [[x_s + d_x / 2, 0.0, z_s + d_z / 2] for x_s in x for z_s in z]
     indices = [[i, j] for i, x_s in enumerate(x) for j, z_s in enumerate(z)]
-    vals = eval_single_dimensional_likelihood(d, activity, T, lors, gamma, np.array(points), scattering=True)
+    vals = likelihood(np.array(points))
     for idx, (i, j) in enumerate(indices):
         img_2[i, j] = vals[idx]
 
@@ -71,13 +73,11 @@ def single_dimensional_likelihood_plot(d: CylinderDetector, activity: float, T: 
 
 
 def scattering_experiment_plot(d: CylinderDetector, p: StaticParticle, activity, T, gamma):
-    # TODO, This needs to be reimplemented, passing down a known scattering rate
-
     # Generate dataset
     lors, scatters = p.simulate_emissions(detector=d, n_lor=int(T * activity))
 
     # Eval likelihood over slices of detector
-    fig, ax = single_dimensional_likelihood_plot(d=d, activity=activity, T=T, gamma=gamma, lors=lors)
+    fig, ax = single_dimensional_likelihood_plot(d=d, activity=activity, T=T, gamma=gamma, lors=lors, mu=p.scatter_rate)
     fig.suptitle(rf'Likelihood, particle={p.to_str_cartesian()}, scattering rate $\mu={p.scatter_rate}$')
 
     return fig, ax
@@ -100,7 +100,7 @@ if __name__ == '__main__':
     p = StaticParticle()
     # p.set_position_cylindrical(r=0.1, theta=0.0, z=0.1)
     # p.set_position_cartesian(x=0.1, y=0.0, z=0.0)
-    p.set_position_cartesian(x=-0.1, y=-0.2, z=0.0)
+    # p.set_position_cartesian(x=-0.1, y=-0.2, z=0.0)
     p.scatter_rate = 3.0
     T, activity = 1.0, 10 ** 4
     X = np.array(p.get_position_cartesian())
@@ -112,5 +112,5 @@ if __name__ == '__main__':
     # args = {'d': det, 'activity': activity, 'T': T, 'gamma': 50.0, 'lors': lors}
 
     fig, ax = scattering_experiment_plot(d=det, p=p, activity=activity, T=T, gamma=50.0)
-    plt.savefig('figures/likelihood/scatter_1.png', format='png')
+    plt.savefig('figures/likelihood/scatter_2.png', format='png')
     plt.show()

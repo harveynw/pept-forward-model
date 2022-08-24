@@ -165,21 +165,6 @@ class StaticParticle(Point):
         n_scatters = 0
 
         for _ in range(n_lor):  # For each requested LOR
-            # plane_phi = np.random.uniform(0, 2 * np.pi)
-            # plane_theta_hat = np.arcsin(2 * np.random.uniform(0, 1) - 1)  # Inverse Transform Sampling
-            # Normal vector to plane, defining the LOR direction
-            # e_phi = np.array([
-            #     np.cos(plane_phi),
-            #     np.sin(plane_phi),
-            #     0.0
-            # ])
-            # e_theta = np.array([
-            #     np.sin(plane_theta_hat) * np.cos(plane_phi + np.pi / 2),
-            #     np.sin(plane_theta_hat) * np.sin(plane_phi + np.pi / 2),
-            #     np.cos(plane_theta_hat)
-            # ])
-            # n = np.cross(e_phi, e_theta)
-            # n = n / np.linalg.norm(n)
             varphi = np.random.uniform(0, 2 * np.pi)
             theta = np.arccos(1 - np.random.uniform(0, 1))  # Inverse Transform Sampling
 
@@ -205,8 +190,6 @@ class StaticParticle(Point):
 
             if not did_impact:
                 continue
-
-            # Note lambda_1 < 0 < lambda_2 and they represent distance in cm as n is a unit vector
 
             if debug_ax is not None and did_impact:
                 line_3d(debug_ax, self.get_position_cartesian(), n, lambda_1, lambda_2, 50,
