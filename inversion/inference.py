@@ -2,7 +2,8 @@ import jax.numpy as np
 
 from jax import jit, vmap, random, grad
 from inversion.integrals import scattering_density
-from inversion.poisson_likelihood import single_dimensional_scattered_likelihood, single_dimensional_likelihood
+from inversion.poisson_likelihood import single_particle_scattered_likelihood, single_particle_likelihood, \
+    single_particle_scattered_likelihood_v2
 from model import CylinderDetector
 
 
@@ -34,8 +35,8 @@ def create_likelihood(d, activity, T, lors, gamma, mu, mc_samples=5, mapped=True
 
     # Construct likelihood closure
     scat_dens_f = scattering_density
-    likelihood_f = single_dimensional_scattered_likelihood
-    gradient_f = jit(grad(single_dimensional_scattered_likelihood, 7))
+    likelihood_f = single_particle_scattered_likelihood_v2
+    gradient_f = jit(grad(single_particle_scattered_likelihood_v2, 7))
     if mapped:
         scat_dens_f = jit(vmap(scat_dens_f, (None, None, 0), 0))
         likelihood_f = jit(vmap(likelihood_f, [None] * 7 + [0, 0] + [None] * 2, 0))

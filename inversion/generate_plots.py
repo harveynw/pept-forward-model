@@ -105,20 +105,22 @@ if __name__ == '__main__':
     T, activity = 1.0, 10 ** 4
     X = np.array(p.get_position_cartesian())
 
-    p.scatter_rate = 8.0
-    fig, ax = scattering_experiment_plot(d=det, p=p, activity=activity, T=T, gamma=50.0)
-    plt.savefig('figures/likelihood/scatter_3.png', format='png')
-    # plt.show()
+    # p.scatter_rate = 8.0
+    # fig, ax = scattering_experiment_plot(d=det, p=p, activity=activity, T=T, gamma=50.0)
+    # plt.savefig('figures/likelihood/scatter_3.png', format='png')
+    # # plt.show()
 
     p.set_position_cartesian(0.1, 0.1, 0.0)
     p.scatter_rate = 0.5
     fig, ax = scattering_experiment_plot(d=det, p=p, activity=activity, T=T, gamma=50.0)
-    plt.savefig('figures/likelihood/scatter_x_1.png', format='png')
+    plt.savefig('figures/likelihood/scatter_x_1_v2.png', format='png')
 
     p.scatter_rate = 3.0
     fig, ax = scattering_experiment_plot(d=det, p=p, activity=activity, T=T, gamma=50.0)
-    plt.savefig('figures/likelihood/scatter_x_2.png', format='png')
+    plt.savefig('figures/likelihood/scatter_x_2_v2.png', format='png')
 
     p.scatter_rate = 8.0
     fig, ax = scattering_experiment_plot(d=det, p=p, activity=activity, T=T, gamma=50.0)
-    plt.savefig('figures/likelihood/scatter_x_3.png', format='png')
+    plt.savefig('figures/likelihood/scatter_x_3_v2.png', format='png')
+
+    # Testing multiple particle case

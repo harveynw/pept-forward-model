@@ -2,7 +2,7 @@ import numpy as np
 import streamlit as st
 st.set_page_config(layout="wide")
 
-from jax_implementation import plot_proj_area
+from inversion.jax_implementation import plot_proj_area
 from model import CylinderDetector, StaticParticle
 
 d = CylinderDetector()
@@ -14,7 +14,7 @@ region = d.detector_cell_from_index(int(n_x/4 + n_y/2 * n_x))
 phi_1_range = region.x_range()
 z_1_range = region.y_range()
 
-st.title('JAX - Projecting detector surface through particle')
+st.title('Projecting detector surface through particle')
 
 particle = StaticParticle()
 p_r = st.slider('R', min_value=0.0, max_value=d.dim_radius_cm, value=0.21)

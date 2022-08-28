@@ -28,7 +28,7 @@ def F_lambdas_hat(R, varphi, X):
 
 def F_lambdas(R, varphi, theta, X):
     l_1_hat, l_2_hat = F_lambdas_hat(R, varphi, X)
-    return 1.0/np.sin(theta) * l_1_hat, 1.0/np.sin(theta) * l_2_hat
+    return 1.0 / np.sin(theta) * l_1_hat, 1.0 / np.sin(theta) * l_2_hat
 
 
 def F_phi_1(R, varphi, X):
@@ -180,7 +180,6 @@ def compute_joint_probability(R, detector_i: tuple, detector_j: tuple, X: np.arr
     detector_corner = np.array([i_phi_min, i_z_min])
     detector_diff = np.array([d_phi, d_z])
 
-    # Integral estimate = Volume * integrand(centroid)
     V = d_phi * d_z
 
     integrand = 0
@@ -194,6 +193,7 @@ def compute_joint_probability(R, detector_i: tuple, detector_j: tuple, X: np.arr
 
     return V * integrand
 
+
 @jit
 def compute_joint_probability_v2(R, detector_i: tuple, detector_j: tuple, X: np.array, gamma, unifs: np.ndarray):
     # P(i, j) Monte Carlo Integration
@@ -204,10 +204,11 @@ def compute_joint_probability_v2(R, detector_i: tuple, detector_j: tuple, X: np.
     n_samples = 20
     sample_points = np.array([i_phi_min, i_z_min]) + np.array([d_phi, d_z]) * unifs
     vmap_characteristic = vmap(characteristic_function, (None, None, 0, 0, None, None), 0)
-    char = 1.0/n_samples * np.sum(vmap_characteristic(R, detector_j, sample_points[:, 0], sample_points[:, 1], X, gamma))
+    char = 1.0 / n_samples * np.sum(
+        vmap_characteristic(R, detector_j, sample_points[:, 0], sample_points[:, 1], X, gamma))
 
     # Other parts of integrand
-    varphi, theta = G_varphi_theta_1(R, i_phi_min+d_phi/2.0, i_z_min+d_z/2.0, X)
+    varphi, theta = G_varphi_theta_1(R, i_phi_min + d_phi / 2.0, i_z_min + d_z / 2.0, X)
     j_1 = jacobian_phi_1(R, varphi, X)
     j_2 = jacobian_z_1(R, varphi, theta, X)
 
@@ -220,7 +221,7 @@ def compute_i_marginal_probability(R, detector_i: tuple, X: np.array):
     # P(i, .) midpoint rule integration
     i_phi_min, i_z_min, d_phi, d_z = detector_i
 
-    centroid = np.array([i_phi_min + d_phi/2.0, i_z_min + d_z/2.0])
+    centroid = np.array([i_phi_min + d_phi / 2.0, i_z_min + d_z / 2.0])
 
     return d_phi * d_z * evaluate_i_integrand(R, centroid, X)
 
@@ -240,8 +241,9 @@ def compute_marginal_probability(R, detector_i: np.array, detectors: np.array, X
     joint_vmapped_1 = vmap(compute_joint_probability, in_axes=(None, None, 0, None, None, None), out_axes=0)
     joint_vmapped_2 = vmap(compute_joint_probability, in_axes=(None, 0, None, None, None, None), out_axes=0)
 
-    return np.sum(joint_vmapped_1(R, detector_i, detectors, X, gamma, unifs))\
+    return np.sum(joint_vmapped_1(R, detector_i, detectors, X, gamma, unifs)) \
            + np.sum(joint_vmapped_2(R, detectors, detector_i, X, gamma, unifs))
+
 
 @jit
 def compute_marginal_probability_v2(R, detector_i: np.array, detectors: np.array, X: np.array, gamma, key: PRNGKey):
