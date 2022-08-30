@@ -7,6 +7,8 @@ from jax import grad, jit, vmap, random
 from jax._src.random import PRNGKey
 from matplotlib import patches
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from tqdm import tqdm
+
 from model import CylinderDetector
 
 
@@ -193,29 +195,6 @@ def compute_joint_probability(R, detector_i: tuple, detector_j: tuple, X: np.arr
 
     return V * integrand
 
-
-@jit
-def compute_joint_probability_v2(R, detector_i: tuple, detector_j: tuple, X: np.array, gamma, unifs: np.ndarray):
-    # P(i, j) Monte Carlo Integration
-    i_phi_min, i_z_min, d_phi, d_z = detector_i
-    _, _, z = X
-
-    # Characteristic Function : Estimating area of D_i,j
-    n_samples = 20
-    sample_points = np.array([i_phi_min, i_z_min]) + np.array([d_phi, d_z]) * unifs
-    vmap_characteristic = vmap(characteristic_function, (None, None, 0, 0, None, None), 0)
-    char = 1.0 / n_samples * np.sum(
-        vmap_characteristic(R, detector_j, sample_points[:, 0], sample_points[:, 1], X, gamma))
-
-    # Other parts of integrand
-    varphi, theta = G_varphi_theta_1(R, i_phi_min + d_phi / 2.0, i_z_min + d_z / 2.0, X)
-    j_1 = jacobian_phi_1(R, varphi, X)
-    j_2 = jacobian_z_1(R, varphi, theta, X)
-
-    V = d_phi * d_z
-    return V * (1 / (2 * np.pi)) * char * np.sin(theta) * j_1 * j_2
-
-
 @jit
 def compute_i_marginal_probability(R, detector_i: tuple, X: np.array):
     # P(i, .) midpoint rule integration
@@ -243,15 +222,6 @@ def compute_marginal_probability(R, detector_i: np.array, detectors: np.array, X
 
     return np.sum(joint_vmapped_1(R, detector_i, detectors, X, gamma, unifs)) \
            + np.sum(joint_vmapped_2(R, detectors, detector_i, X, gamma, unifs))
-
-
-@jit
-def compute_marginal_probability_v2(R, detector_i: np.array, detectors: np.array, X: np.array, gamma, key: PRNGKey):
-    joint_vmapped_1 = vmap(compute_joint_probability_v2, in_axes=(None, None, 0, None, None, None), out_axes=0)
-    joint_vmapped_2 = vmap(compute_joint_probability_v2, in_axes=(None, 0, None, None, None, None), out_axes=0)
-
-    return np.sum(joint_vmapped_1(R, detector_i, detectors, X, gamma, key)) \
-           + np.sum(joint_vmapped_2(R, detectors, detector_i, X, gamma, key))
 
 
 def plot_proj_area(min_phi=np.pi / 2 - 0.05, max_phi=np.pi / 2 + 0.05, min_z=0.20, max_z=0.30, x=0.0, y=0.0, z=0.25):
@@ -297,7 +267,7 @@ def plot_proj_area(min_phi=np.pi / 2 - 0.05, max_phi=np.pi / 2 + 0.05, min_z=0.2
     return fig, ax
 
 
-def plot_marginal(X=None, gamma=200):
+def plot_marginal(X=None, gamma=500):
     if X is None:
         X = np.array([0.0, 0.0, 0.0])
     else:
@@ -313,14 +283,18 @@ def plot_marginal(X=None, gamma=200):
     detectors = np.array([list(quad.min()) + [d_phi, d_z] for quad in detector_quads])
 
     key = random.PRNGKey(0)
-    unifs = random.uniform(key=key, shape=(25, 2))
+    unifs = random.uniform(key=key, shape=(100, 2))
 
-    # marginal_mapped = jit(vmap(compute_marginal_probability_v2, in_axes=(None, 0, None, None, None, None), out_axes=0))
     marginal_mapped = jit(vmap(compute_marginal_probability, in_axes=(None, 0, None, None, None, None), out_axes=0))
 
     print('Evaluating marginal over entire detector')
-    vals = marginal_mapped(d.dim_radius_cm, detectors, detectors, X, gamma, unifs)
-    # vals = marginal_mapped(d.dim_radius_cm, detectors, detectors, X, gamma, unifs)
+    detectors_batched = np.array_split(detectors, 500)
+
+    vals_batched = []
+    for batch in tqdm(detectors_batched):
+        vals_batched += [marginal_mapped(d.dim_radius_cm, batch, detectors, X, gamma, unifs)]
+
+    vals = np.concatenate(vals_batched)
 
     img = onp.array(vals).reshape((n_z, n_phi))
 
@@ -348,8 +322,9 @@ if __name__ == '__main__':
     # plt.savefig('figures/comparison/marginal_2.png', format='png', bbox_inches='tight')
 
     plot_marginal(X=[0.1, 0.1, 0.18])
-    plt.savefig('figures/comparison/marginal_3.eps', format='eps', bbox_inches='tight')
-    plt.savefig('figures/comparison/marginal_3.png', format='png', bbox_inches='tight')
+    plt.show()
+    # plt.savefig('figures/comparison/marginal_3.eps', format='eps', bbox_inches='tight')
+    # plt.savefig('figures/comparison/marginal_3.png', format='png', bbox_inches='tight')
 
     # #  Gradient eval on joint test
     # d = CylinderDetector()

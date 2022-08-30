@@ -132,7 +132,7 @@ if __name__ == '__main__':
         },
     ]
 
-    for exp in [experiments[2]]:
+    for exp in experiments:
         p.set_position_cartesian(*exp['pos'])
         p.scatter_rate = exp['scatter_rate']
         fig, ax = scattering_experiment_plot(d=det, p=p, activity=exp['activity'], T=T, gamma=50.0)
