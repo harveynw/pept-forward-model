@@ -3,7 +3,7 @@ import jax.numpy as np
 from jax import jit, vmap, random, grad
 from inversion.integrals import scattering_density
 from inversion.poisson_likelihood import single_particle_scattered_likelihood, single_particle_likelihood, \
-    single_particle_scattered_likelihood_v2
+    single_particle_scattered_likelihood_v2, multiple_particle_scattered_likelihood
 from model import CylinderDetector
 
 
@@ -49,5 +49,39 @@ def create_likelihood(d, activity, T, lors, gamma, mu, mc_samples=5, mapped=True
     def gradient(X):
         scat_dens = scat_dens_f(R, mu, X)
         return gradient_f(R, H, n_cells, activity, T, detections_i, detections_j, X, scat_dens, gamma, unifs)
+
+    return likelihood, gradient
+
+
+def create_multi_likelihood(d, activities, T, lors, gamma, mu, mc_samples=5, mapped=True):
+    # Returns a closure that evaluates the likelihood (and the gradient) for a given X (or X's)
+
+    # Uniform samples on [0,1] x [0,1] for estimating integrals
+    key = random.PRNGKey(0)
+    unifs = random.uniform(key=key, shape=(mc_samples, 2))
+
+    # Collecting LoRs into JAX Arrays
+    detections_i, detections_j = encode_lors(d, lors)
+    R, H = d.dim_radius_cm, d.dim_height_cm
+    n_cells = d.n_detector_cells()[0] * d.n_detector_cells()[1]
+
+    # Construct likelihood closure
+    scat_dens_f = vmap(scattering_density, (None, None, 0), 0)
+    likelihood_f = multiple_particle_scattered_likelihood
+    gradient_f = jit(grad(multiple_particle_scattered_likelihood, 7))
+    if mapped:
+        scat_dens_f = vmap(scat_dens_f, (None, None, 0), 0)
+        # R, H, n_cells, rates, T, detections_i, detections_j, X, scattering_dens_X,
+        #                                            gamma, unifs
+        likelihood_f = vmap(likelihood_f, [None] * 7 + [0, 0] + [None, None], 0)
+        gradient_f = vmap(gradient_f, [None] * 7 + [0, 0] + [None, None], 0)
+
+    def likelihood(X_k):
+        scat_dens = scat_dens_f(R, mu, X_k)
+        return likelihood_f(R, H, n_cells, activities, T, detections_i, detections_j, X_k, scat_dens, gamma, unifs)
+
+    def gradient(X_k):
+        scat_dens = scat_dens_f(R, mu, X_k)
+        return gradient_f(R, H, n_cells, activities, T, detections_i, detections_j, X_k, scat_dens, gamma, unifs)
 
     return likelihood, gradient

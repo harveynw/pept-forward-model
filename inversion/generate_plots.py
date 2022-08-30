@@ -37,7 +37,7 @@ def G_solid_angle_plot(beta_ratio):
 def single_dimensional_likelihood_plot(d: CylinderDetector, activity: float, T: float, lors: list, gamma: float, mu: float):
     fig, (ax1, ax2) = plt.subplots(ncols=2)
 
-    likelihood, _ = create_likelihood(d, activity, T, lors, gamma, mu, mc_samples=5, mapped=True)
+    likelihood, _ = create_likelihood(d, activity, T, lors, gamma, mu, mc_samples=10, mapped=True)
 
     R, H = d.dim_radius_cm, d.dim_height_cm
     n_samps = 100
@@ -72,13 +72,13 @@ def single_dimensional_likelihood_plot(d: CylinderDetector, activity: float, T: 
     return fig, (ax1, ax2)
 
 
-def scattering_experiment_plot(d: CylinderDetector, p: StaticParticle, activity, T, gamma):
+def scattering_experiment_plot(d: CylinderDetector, p: StaticParticle, activity, T, gamma) -> (plt.Figure, plt.axis):
     # Generate dataset
     lors, scatters = p.simulate_emissions(detector=d, n_lor=int(T * activity))
 
     # Eval likelihood over slices of detector
     fig, ax = single_dimensional_likelihood_plot(d=d, activity=activity, T=T, gamma=gamma, lors=lors, mu=p.scatter_rate)
-    fig.suptitle(rf'Likelihood, particle={p.to_str_cartesian()}, scattering rate $\mu={p.scatter_rate}$')
+    # fig.suptitle(rf'Likelihood, particle={p.to_str_cartesian()}, scattering rate $\mu={p.scatter_rate}$')
 
     return fig, ax
 
@@ -102,25 +102,61 @@ if __name__ == '__main__':
     # p.set_position_cartesian(x=0.1, y=0.0, z=0.0)
     # p.set_position_cartesian(x=-0.1, y=-0.2, z=0.0)
     p.scatter_rate = 3.0
-    T, activity = 1.0, 10 ** 4
+    T = 1.0
     X = np.array(p.get_position_cartesian())
 
+    experiments = [
+        {
+            'pos': [0.0, 0.0, 0.0], 'scatter_rate': 0.001, 'activity': 10**4,
+            'name': 'no_scatter_01', 'title': None
+        },
+        {
+            'pos': [0.1, 0.1, 0.0], 'scatter_rate': 0.001, 'activity': 10**4,
+            'name': 'no_scatter_02', 'title': None
+        },
+        {
+            'pos': [-0.1, 0.0, 0.1], 'scatter_rate': 0.001, 'activity': 10**4,
+            'name': 'no_scatter_03', 'title': None
+        },
+        {
+            'pos': [0.1, 0.0, 0.0], 'scatter_rate': 1.5, 'activity': 10**4,
+            'name': 'scatter_mu_1_5', 'title': None
+        },
+        {
+            'pos': [0.1, 0.0, 0.0], 'scatter_rate': 3.0, 'activity': 10**4,
+            'name': 'scatter_mu_3_0', 'title': None
+        },
+        {
+            'pos': [0.1, 0.0, 0.0], 'scatter_rate': 8.0, 'activity': 10**4,
+            'name': 'scatter_mu_8_0', 'title': None
+        },
+    ]
+
+    for exp in [experiments[2]]:
+        p.set_position_cartesian(*exp['pos'])
+        p.scatter_rate = exp['scatter_rate']
+        fig, ax = scattering_experiment_plot(d=det, p=p, activity=exp['activity'], T=T, gamma=50.0)
+
+        if exp['title']:
+            title = exp['title']
+            title = title.replace('PARTICLE_POS', p.get_position_cartesian())
+            ax.set_title(title)
+
+        plt.savefig(f'figures/likelihood/{exp["name"]}.png', format='png')
+        plt.savefig(f'figures/likelihood/{exp["name"]}.eps', format='eps', bbox_inches='tight')
+
+
+    # p.set_position_cartesian(0.1, 0.1, 0.0)
+    # p.scatter_rate = 0.5
+    # fig, ax = scattering_experiment_plot(d=det, p=p, activity=activity, T=T, gamma=50.0)
+    # plt.savefig('figures/likelihood/scatter_x_1_v2.png', format='png')
+    #
+    # p.scatter_rate = 3.0
+    # fig, ax = scattering_experiment_plot(d=det, p=p, activity=activity, T=T, gamma=50.0)
+    # plt.savefig('figures/likelihood/scatter_x_2_v2.png', format='png')
+    #
     # p.scatter_rate = 8.0
     # fig, ax = scattering_experiment_plot(d=det, p=p, activity=activity, T=T, gamma=50.0)
-    # plt.savefig('figures/likelihood/scatter_3.png', format='png')
-    # # plt.show()
-
-    p.set_position_cartesian(0.1, 0.1, 0.0)
-    p.scatter_rate = 0.5
-    fig, ax = scattering_experiment_plot(d=det, p=p, activity=activity, T=T, gamma=50.0)
-    plt.savefig('figures/likelihood/scatter_x_1_v2.png', format='png')
-
-    p.scatter_rate = 3.0
-    fig, ax = scattering_experiment_plot(d=det, p=p, activity=activity, T=T, gamma=50.0)
-    plt.savefig('figures/likelihood/scatter_x_2_v2.png', format='png')
-
-    p.scatter_rate = 8.0
-    fig, ax = scattering_experiment_plot(d=det, p=p, activity=activity, T=T, gamma=50.0)
-    plt.savefig('figures/likelihood/scatter_x_3_v2.png', format='png')
+    # plt.savefig('figures/likelihood/scatter_x_3_v2.png', format='png')
 
     # Testing multiple particle case
