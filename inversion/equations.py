@@ -1,4 +1,6 @@
 import random
+
+import jax.lax
 import numpy as onp
 import jax.numpy as np
 import matplotlib.pyplot as plt
@@ -9,7 +11,7 @@ from matplotlib import patches
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from tqdm import tqdm
 
-from model import CylinderDetector
+from model import CylinderDetector, StaticParticle
 
 
 # Detectors are defined throughout as array([min_phi, min_z, d_phi, d_z])
@@ -137,10 +139,6 @@ def characteristic_function(R, detector_j, phi_1, z_1, X, gamma):
     return cond_1 * cond_2 * cond_3 * cond_4
 
 
-def projected_inside_detector(R, detector_j, phi_1, z_1, X, gamma):
-    return characteristic_function(R, detector_j, phi_1, z_1, X, gamma)
-
-
 def evaluate_joint_integrand(R, sample_point, detector_j, X, gamma):
     phi_1, z_1 = sample_point
 
@@ -195,6 +193,30 @@ def compute_joint_probability(R, detector_i: tuple, detector_j: tuple, X: np.arr
 
     return V * integrand
 
+
+@jit
+def compute_joint_probability_v2(R, detector_i: tuple, detector_j: tuple, X: np.array, gamma, unifs: np.array):
+    # P(i, j) Monte Carlo Integration, this is faster to compile to XLA than compute_joint_probability
+    i_phi_min, i_z_min, d_phi, d_z = detector_i
+    _, _, z = X
+
+    detector_corner = np.array([i_phi_min, i_z_min])
+    detector_diff = np.array([d_phi, d_z])
+
+    V = d_phi * d_z
+    n_samples = unifs.shape[0]
+
+    def loop_fun(i, v):
+        sample = detector_corner + unifs[i, :] * detector_diff
+        return v + smaller_than(z, sample[1], gamma) * evaluate_joint_integrand(R, sample, detector_j, X, gamma)
+
+    integrand = jax.lax.fori_loop(lower=0, upper=n_samples,
+                                  body_fun=loop_fun, init_val=0.0)
+    integrand = 1.0 / n_samples * integrand
+
+    return V * integrand
+
+
 @jit
 def compute_i_marginal_probability(R, detector_i: tuple, X: np.array):
     # P(i, .) midpoint rule integration
@@ -217,54 +239,11 @@ def compute_j_marginal_probability(R, detector_j: tuple, X: np.array):
 
 @jit
 def compute_marginal_probability(R, detector_i: np.array, detectors: np.array, X: np.array, gamma, unifs: np.array):
-    joint_vmapped_1 = vmap(compute_joint_probability, in_axes=(None, None, 0, None, None, None), out_axes=0)
-    joint_vmapped_2 = vmap(compute_joint_probability, in_axes=(None, 0, None, None, None, None), out_axes=0)
+    joint_vmapped_1 = vmap(compute_joint_probability_v2, in_axes=(None, None, 0, None, None, None), out_axes=0)
+    joint_vmapped_2 = vmap(compute_joint_probability_v2, in_axes=(None, 0, None, None, None, None), out_axes=0)
 
     return np.sum(joint_vmapped_1(R, detector_i, detectors, X, gamma, unifs)) \
            + np.sum(joint_vmapped_2(R, detectors, detector_i, X, gamma, unifs))
-
-
-def plot_proj_area(min_phi=np.pi / 2 - 0.05, max_phi=np.pi / 2 + 0.05, min_z=0.20, max_z=0.30, x=0.0, y=0.0, z=0.25):
-    jit_test = jit(projected_inside_detector)
-
-    fig, ax = plt.subplots()
-    plt.rcParams.update({
-        'text.usetex': True,
-        'text.latex.preamble': r'\usepackage{amsfonts}'
-    })
-    fig.set_size_inches(8, 20)
-
-    shp = (314 * 2, 50 * 2)
-    phi_vals = onp.linspace(0, 2 * onp.pi, num=shp[0])
-    z_vals = onp.linspace(0, 0.5, num=shp[1])
-
-    img = onp.zeros((len(phi_vals), len(z_vals)))
-
-    for i, phi_samp in enumerate(phi_vals):
-        for j, z_samp in enumerate(z_vals):
-            img[i, j] = jit_test(R=0.5,
-                                 min_phi=min_phi,
-                                 max_phi=max_phi,
-                                 min_z=min_z,
-                                 max_z=max_z,
-                                 phi_1=phi_samp, z_1=z_samp,
-                                 X=np.array([x, y, z]))
-
-    ax.imshow(img.transpose(), origin='lower')
-
-    # Plot original detector
-    d_dphi = (max_phi - min_phi) / (2 * onp.pi) * shp[0]
-    d_dz = (max_z - min_z) / 0.5 * shp[1]
-    rect = patches.Rectangle((min_phi / (2 * onp.pi) * shp[0], min_z / 0.5 * shp[1]), d_dphi, d_dz,
-                             linewidth=1, edgecolor='r', facecolor='none', label=r'$\mathcal{D}_j$ boundary')
-    ax.add_patch(rect)
-    ax.legend()
-
-    ax.set_xlabel(r'Horizontal $\phi_1 \in [0, 2\pi]$')
-    ax.set_ylabel(r'Vertical $z_1 \in [0, 0.5]$')
-    ax.set_title(r'$\mathbb{I}_j(\phi_1, z_1)$')
-
-    return fig, ax
 
 
 def plot_marginal(X=None, gamma=500):
@@ -283,7 +262,7 @@ def plot_marginal(X=None, gamma=500):
     detectors = np.array([list(quad.min()) + [d_phi, d_z] for quad in detector_quads])
 
     key = random.PRNGKey(0)
-    unifs = random.uniform(key=key, shape=(200, 2))
+    unifs = random.uniform(key=key, shape=(100, 2))
 
     marginal_mapped = jit(vmap(compute_marginal_probability, in_axes=(None, 0, None, None, None, None), out_axes=0))
 
@@ -323,8 +302,6 @@ if __name__ == '__main__':
         plot_marginal(X=exp['position'])
         plt.savefig(f'figures/marginal/{exp["name"]}.eps', format='eps', bbox_inches='tight')
         plt.savefig(f'figures/marginal/{exp["name"]}.png', format='png', bbox_inches='tight')
-
-
 
     # plot_marginal()
     # plt.savefig('figures/comparison/marginal_1.eps', format='eps', bbox_inches='tight')

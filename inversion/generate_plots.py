@@ -2,7 +2,9 @@ import jax.numpy as np
 import numpy as onp
 import matplotlib.pyplot as plt
 
+from matplotlib import patches
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from inversion.equations import characteristic_function
 from inversion.inference import create_likelihood
 from inversion.integrals import G_integral
 from model import CylinderDetector, StaticParticle
@@ -83,6 +85,48 @@ def scattering_experiment_plot(d: CylinderDetector, p: StaticParticle, activity,
     return fig, ax
 
 
+def plot_proj_area(min_phi, min_z, d_phi, d_z, p: StaticParticle, gamma: float):
+    # Plots characteristic_function(R, detector_j, phi_1, z_1, X, gamma)
+    detector_j = np.array([min_phi, min_z, d_phi, d_z])
+    X = np.array(p.get_position_cartesian())
+
+    fig, ax = plt.subplots()
+    plt.rcParams.update({
+        'text.usetex': True,
+        'text.latex.preamble': r'\usepackage{amsfonts}'
+    })
+    fig.set_size_inches(8, 20)
+
+    shp = (314 * 2, 50 * 2)
+    phi_vals = onp.linspace(0, 2 * onp.pi, num=shp[0])
+    z_vals = onp.linspace(0, 0.5, num=shp[1])
+
+    img = onp.zeros((len(phi_vals), len(z_vals)))
+
+    for i, phi_samp in enumerate(phi_vals):
+        for j, z_samp in enumerate(z_vals):
+            img[i, j] = characteristic_function(R=0.5,
+                                                detector_j=detector_j,
+                                                phi_1=phi_samp, z_1=z_samp,
+                                                X=X, gamma=gamma)
+
+    ax.imshow(img.transpose(), origin='lower')
+
+    # Plot original detector
+    d_dphi = d_phi / (2 * onp.pi) * shp[0]
+    d_dz = d_z / 0.5 * shp[1]
+    rect = patches.Rectangle((min_phi / (2 * onp.pi) * shp[0], min_z / 0.5 * shp[1]), d_dphi, d_dz,
+                             linewidth=1, edgecolor='r', facecolor='none', label=r'$\mathcal{D}_j$ boundary')
+    ax.add_patch(rect)
+    ax.legend()
+
+    ax.set_xlabel(r'Horizontal $\phi_1 \in [0, 2\pi]$')
+    ax.set_ylabel(r'Vertical $z_1 \in [0, 0.5]$')
+    ax.set_title(r'$\mathbb{I}_j(\phi_1, z_1)$')
+
+    return fig, ax
+
+
 if __name__ == '__main__':
     # d = CylinderDetector()
     #
@@ -96,67 +140,63 @@ if __name__ == '__main__':
     # plt.show()
 
     # Setup particle and set to no scattering
-    det = CylinderDetector()
-    p = StaticParticle()
-    # p.set_position_cylindrical(r=0.1, theta=0.0, z=0.1)
-    # p.set_position_cartesian(x=0.1, y=0.0, z=0.0)
-    # p.set_position_cartesian(x=-0.1, y=-0.2, z=0.0)
-    p.scatter_rate = 3.0
-    T = 1.0
-    X = np.array(p.get_position_cartesian())
-
-    experiments = [
-        {
-            'pos': [0.0, 0.0, 0.0], 'scatter_rate': 0.001, 'activity': 10**4,
-            'name': 'no_scatter_01', 'title': None
-        },
-        {
-            'pos': [0.1, 0.1, 0.0], 'scatter_rate': 0.001, 'activity': 10**4,
-            'name': 'no_scatter_02', 'title': None
-        },
-        {
-            'pos': [-0.1, 0.0, 0.1], 'scatter_rate': 0.001, 'activity': 10**4,
-            'name': 'no_scatter_03', 'title': None
-        },
-        {
-            'pos': [0.1, 0.0, 0.0], 'scatter_rate': 1.5, 'activity': 10**4,
-            'name': 'scatter_mu_1_5', 'title': None
-        },
-        {
-            'pos': [0.1, 0.0, 0.0], 'scatter_rate': 3.0, 'activity': 10**4,
-            'name': 'scatter_mu_3_0', 'title': None
-        },
-        {
-            'pos': [0.1, 0.0, 0.0], 'scatter_rate': 8.0, 'activity': 10**4,
-            'name': 'scatter_mu_8_0', 'title': None
-        },
-    ]
-
-    for exp in experiments:
-        p.set_position_cartesian(*exp['pos'])
-        p.scatter_rate = exp['scatter_rate']
-        fig, ax = scattering_experiment_plot(d=det, p=p, activity=exp['activity'], T=T, gamma=50.0)
-
-        if exp['title']:
-            title = exp['title']
-            title = title.replace('PARTICLE_POS', p.get_position_cartesian())
-            ax.set_title(title)
-
-        plt.savefig(f'figures/likelihood/{exp["name"]}.png', format='png')
-        plt.savefig(f'figures/likelihood/{exp["name"]}.eps', format='eps', bbox_inches='tight')
-
-
-    # p.set_position_cartesian(0.1, 0.1, 0.0)
-    # p.scatter_rate = 0.5
-    # fig, ax = scattering_experiment_plot(d=det, p=p, activity=activity, T=T, gamma=50.0)
-    # plt.savefig('figures/likelihood/scatter_x_1_v2.png', format='png')
-    #
+    # det = CylinderDetector()
+    # p = StaticParticle()
     # p.scatter_rate = 3.0
-    # fig, ax = scattering_experiment_plot(d=det, p=p, activity=activity, T=T, gamma=50.0)
-    # plt.savefig('figures/likelihood/scatter_x_2_v2.png', format='png')
+    # T = 1.0
+    # X = np.array(p.get_position_cartesian())
     #
-    # p.scatter_rate = 8.0
-    # fig, ax = scattering_experiment_plot(d=det, p=p, activity=activity, T=T, gamma=50.0)
-    # plt.savefig('figures/likelihood/scatter_x_3_v2.png', format='png')
+    # experiments = [
+    #     {
+    #         'pos': [0.0, 0.0, 0.0], 'scatter_rate': 0.001, 'activity': 10**4,
+    #         'name': 'no_scatter_01', 'title': None
+    #     },
+    #     {
+    #         'pos': [0.1, 0.1, 0.0], 'scatter_rate': 0.001, 'activity': 10**4,
+    #         'name': 'no_scatter_02', 'title': None
+    #     },
+    #     {
+    #         'pos': [-0.1, 0.0, 0.1], 'scatter_rate': 0.001, 'activity': 10**4,
+    #         'name': 'no_scatter_03', 'title': None
+    #     },
+    #     {
+    #         'pos': [0.1, 0.0, 0.0], 'scatter_rate': 1.5, 'activity': 10**4,
+    #         'name': 'scatter_mu_1_5', 'title': None
+    #     },
+    #     {
+    #         'pos': [0.1, 0.0, 0.0], 'scatter_rate': 3.0, 'activity': 10**4,
+    #         'name': 'scatter_mu_3_0', 'title': None
+    #     },
+    #     {
+    #         'pos': [0.1, 0.0, 0.0], 'scatter_rate': 8.0, 'activity': 10**4,
+    #         'name': 'scatter_mu_8_0', 'title': None
+    #     },
+    # ]
+    #
+    # for exp in experiments:
+    #     p.set_position_cartesian(*exp['pos'])
+    #     p.scatter_rate = exp['scatter_rate']
+    #     fig, ax = scattering_experiment_plot(d=det, p=p, activity=exp['activity'], T=T, gamma=50.0)
+    #
+    #     if exp['title']:
+    #         title = exp['title']
+    #         title = title.replace('PARTICLE_POS', p.get_position_cartesian())
+    #         ax.set_title(title)
+    #
+    #     plt.savefig(f'figures/likelihood/{exp["name"]}.png', format='png')
+    #     plt.savefig(f'figures/likelihood/{exp["name"]}.eps', format='eps', bbox_inches='tight')
 
-    # Testing multiple particle case
+
+    p = StaticParticle()
+    p_r, p_theta, p_z = 0.21, 0.32, 0.11
+    p.set_position_cylindrical(r=p_r, theta=p_theta, z=p_z)
+    for gamma in [5, 50, 500]:
+        fig, ax = plot_proj_area(min_phi=np.pi / 2 - 0.05,
+                                 min_z=0.39,
+                                 d_phi=0.1,
+                                 d_z=0.1,
+                                 p=p,
+                                 gamma=gamma)
+        ax.set_title(ax.get_title() + r', particle at ' + p.to_str_cylindrical(True))
+        plt.savefig(f'figures/projection_area/gamma_{gamma}.png', format='png')
+        plt.savefig(f'figures/projection_area/gamma_{gamma}.eps', format='eps', bbox_inches='tight')
