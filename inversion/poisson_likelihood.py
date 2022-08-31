@@ -2,7 +2,7 @@ import jax.numpy as np
 
 from jax import jit, vmap
 from inversion.integrals import G_integral, H_integral
-from inversion.jax_implementation import compute_joint_probability, compute_j_marginal_probability, \
+from inversion.equations import compute_joint_probability, compute_j_marginal_probability, \
     compute_i_marginal_probability
 
 

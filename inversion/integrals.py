@@ -1,7 +1,7 @@
 import jax.numpy as np
 
 from jax import jit, vmap
-from inversion.jax_implementation import F_lambdas
+from inversion.equations import F_lambdas
 
 
 @jit

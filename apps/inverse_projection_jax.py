@@ -2,7 +2,7 @@ import numpy as np
 import streamlit as st
 st.set_page_config(layout="wide")
 
-from inversion.jax_implementation import plot_proj_area
+from inversion.equations import plot_proj_area
 from model import CylinderDetector, StaticParticle
 
 d = CylinderDetector()
