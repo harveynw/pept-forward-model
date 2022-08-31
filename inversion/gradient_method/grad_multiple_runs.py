@@ -53,12 +53,14 @@ plt.plot(t, avg_err, label='Average Error')
 plt.fill_between(x=t, y1=min_err, y2=max_err, alpha=0.5)
 plt.plot(t, min_err, '-', c='grey', label='Min Error')
 plt.plot(t, max_err, '--', c='grey', label='Max Error')
-plt.title(f'Gradient Ascent Convergence for {p.to_str_cartesian()}, n={n_experiments} with random initial position')
+plt.title(f'Gradient Ascent of Likelihood recovering {p.to_str_cartesian()} over n={n_experiments} runs')
 plt.xlabel('Iterations, n')
 plt.ylabel(r'Error $\|x^{*} - x_n\|$')
 plt.legend()
-plt.show()
+plt.savefig('figures/grad_ascent_multiple.png', format='png')
+plt.savefig('figures/grad_ascent_multiple.eps', format='eps', bbox_inches='tight')
 
+exit()
 
 traj = onp.array(traj_history)
 for traj_index in range(traj.shape[1]):

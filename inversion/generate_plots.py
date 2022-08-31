@@ -85,7 +85,7 @@ def scattering_experiment_plot(d: CylinderDetector, p: StaticParticle, activity,
     return fig, ax
 
 
-def plot_proj_area(min_phi, min_z, d_phi, d_z, p: StaticParticle, gamma: float):
+def plot_proj_area(min_phi, min_z, d_phi, d_z, p: StaticParticle, d: CylinderDetector, gamma: float):
     # Plots characteristic_function(R, detector_j, phi_1, z_1, X, gamma)
     detector_j = np.array([min_phi, min_z, d_phi, d_z])
     X = np.array(p.get_position_cartesian())
@@ -95,7 +95,7 @@ def plot_proj_area(min_phi, min_z, d_phi, d_z, p: StaticParticle, gamma: float):
         'text.usetex': True,
         'text.latex.preamble': r'\usepackage{amsfonts}'
     })
-    fig.set_size_inches(8, 20)
+    # fig.set_size_inches(8, 20)
 
     shp = (314 * 2, 50 * 2)
     phi_vals = onp.linspace(0, 2 * onp.pi, num=shp[0])
@@ -105,7 +105,7 @@ def plot_proj_area(min_phi, min_z, d_phi, d_z, p: StaticParticle, gamma: float):
 
     for i, phi_samp in enumerate(phi_vals):
         for j, z_samp in enumerate(z_vals):
-            img[i, j] = characteristic_function(R=0.5,
+            img[i, j] = characteristic_function(R=d.dim_radius_cm,
                                                 detector_j=detector_j,
                                                 phi_1=phi_samp, z_1=z_samp,
                                                 X=X, gamma=gamma)
@@ -188,6 +188,7 @@ if __name__ == '__main__':
 
 
     p = StaticParticle()
+    d = CylinderDetector()
     p_r, p_theta, p_z = 0.21, 0.32, 0.11
     p.set_position_cylindrical(r=p_r, theta=p_theta, z=p_z)
     for gamma in [5, 50, 500]:
@@ -195,8 +196,9 @@ if __name__ == '__main__':
                                  min_z=0.39,
                                  d_phi=0.1,
                                  d_z=0.1,
-                                 p=p,
+                                 p=p, d=d,
                                  gamma=gamma)
+        plt.show()
         ax.set_title(ax.get_title() + r', particle at ' + p.to_str_cylindrical(True))
         plt.savefig(f'figures/projection_area/gamma_{gamma}.png', format='png')
         plt.savefig(f'figures/projection_area/gamma_{gamma}.eps', format='eps', bbox_inches='tight')
