@@ -283,12 +283,12 @@ def plot_marginal(X=None, gamma=500):
     detectors = np.array([list(quad.min()) + [d_phi, d_z] for quad in detector_quads])
 
     key = random.PRNGKey(0)
-    unifs = random.uniform(key=key, shape=(100, 2))
+    unifs = random.uniform(key=key, shape=(200, 2))
 
     marginal_mapped = jit(vmap(compute_marginal_probability, in_axes=(None, 0, None, None, None, None), out_axes=0))
 
     print('Evaluating marginal over entire detector')
-    detectors_batched = np.array_split(detectors, 500)
+    detectors_batched = np.array_split(detectors, 300)
 
     vals_batched = []
     for batch in tqdm(detectors_batched):
@@ -313,6 +313,19 @@ def plot_marginal(X=None, gamma=500):
 if __name__ == '__main__':
     #  Marginal Example Plots
 
+    experiments = [
+        {'position': [0.0, 0.0, 0.0], 'name': 'marginal_1'},
+        {'position': [0.1, 0.1, 0.0], 'name': 'marginal_2'},
+        {'position': [0.1, 0.1, 0.18], 'name': 'marginal_3'},
+    ]
+
+    for exp in experiments:
+        plot_marginal(X=exp['position'])
+        plt.savefig(f'figures/marginal/{exp["name"]}.eps', format='eps', bbox_inches='tight')
+        plt.savefig(f'figures/marginal/{exp["name"]}.png', format='png', bbox_inches='tight')
+
+
+
     # plot_marginal()
     # plt.savefig('figures/comparison/marginal_1.eps', format='eps', bbox_inches='tight')
     # plt.savefig('figures/comparison/marginal_1.png', format='png', bbox_inches='tight')
@@ -321,8 +334,8 @@ if __name__ == '__main__':
     # plt.savefig('figures/comparison/marginal_2.eps', format='eps', bbox_inches='tight')
     # plt.savefig('figures/comparison/marginal_2.png', format='png', bbox_inches='tight')
 
-    plot_marginal(X=[0.1, 0.1, 0.18])
-    plt.show()
+    # plot_marginal(X=[0.1, 0.1, 0.18])
+    # plt.show()
     # plt.savefig('figures/comparison/marginal_3.eps', format='eps', bbox_inches='tight')
     # plt.savefig('figures/comparison/marginal_3.png', format='png', bbox_inches='tight')
 
