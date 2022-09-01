@@ -107,13 +107,20 @@ p5 = StaticParticle()
 # p5.set_position_cylindrical(r=0.96*d5.dim_radius_cm, theta=np.pi, z=d5.dim_height_cm/2)
 # p5.set_position_cylindrical(r=0.20, theta=np.pi/2, z=0.25)
 # p5.set_position_cartesian(0.1, 0.1, 0.25)
-p5.set_position_cartesian(0.1, 0.1, 0.0)
-p5.scatter_rate = 15.0
+p5.set_position_cartesian(0.1, 0.1, 0.18)
+
+# experiments = [
+#         {'position': [0.0, 0.0, 0.0], 'name': 'marginal_1'},
+#         {'position': [0.1, 0.1, 0.0], 'name': 'marginal_2'},
+#         {'position': [0.1, 0.1, 0.18], 'name': 'marginal_3'},
+#     ]
+
+p5.scatter_rate = 0.0001
 print('Mean scattering distance:', 1/p5.scatter_rate)
 
-use_multicore = False
+use_multicore = True
 if use_multicore:
-    n_batches = 8
+    n_batches = 10
     n_lor = 10000
     sims = Parallel(n_jobs=-1)(delayed(p5.simulate_emissions)(detector=d5, n_lor=n_lor) for _ in range(n_batches))
     lors, scatters = sum([sim[0] for sim in sims], []), sum([sim[1] for sim in sims])
@@ -125,7 +132,6 @@ if len(lors) > 0:
     scatter_rate = scatters/(2*len(lors))
 else:
     print('No LoRs')
-exit()
 
 for lor in lors:
     i, j = lor
@@ -139,6 +145,7 @@ plt.title(fr'Forward-Model Hit Count for particle at {p5.to_str_cylindrical(late
 plt.xlabel('Horizontal')
 plt.ylabel('Vertical')
 plt.savefig('figures/comparison/forward_model_3.eps', format='eps', bbox_inches='tight')
+plt.savefig('figures/comparison/forward_model_3.png', format='png')
 plt.show()
 
 # Plot 6: Detector cell analysis in another way
