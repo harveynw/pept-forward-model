@@ -72,7 +72,7 @@ if __name__ == '__main__':
     p.set_position_cartesian(x=0.12, y=0.1, z=0.03)
     p.scatter_rate = 2.0
     T, activity = 1.0, 10 ** 4
-    lors, scatters = p.simulate_emissions(detector=d, n_lor=int(T * activity))
+    lors, scatters = p.simulate_emissions(detector=d, n_emissions=int(T * activity))
 
     def neighbour(X):
         while True:

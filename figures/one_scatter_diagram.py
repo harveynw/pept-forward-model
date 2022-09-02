@@ -11,7 +11,7 @@ detector = CylinderDetector()
 fig = plt.figure(figsize=(10, 5))
 ax = fig.add_subplot(111, projection='3d')
 while True:
-    impacts, n_scatters = particle.simulate_emissions(detector=detector, n_lor=1, debug_ax=ax)
+    impacts, n_scatters = particle.simulate_emissions(detector=detector, n_emissions=1, debug_ax=ax)
 
     if n_scatters == 1:  # Make sure one did occur
         ax.axes.set_xlim3d(left=-0.01-detector.dim_radius_cm, right=0.01+detector.dim_radius_cm)

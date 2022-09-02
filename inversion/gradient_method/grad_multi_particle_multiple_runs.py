@@ -24,7 +24,7 @@ lors = []
 
 for activity, x in zip(activities, X_actual):
     p.set_position_cartesian(*x)
-    lors_new, _ = p.simulate_emissions(detector=d, n_lor=int(T * activity))
+    lors_new, _ = p.simulate_emissions(detector=d, n_emissions=int(T * activity))
     lors += lors_new
 
 print('Sim done')

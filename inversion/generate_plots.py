@@ -103,7 +103,7 @@ def single_dimensional_likelihood_plot_only_horizontal(d: CylinderDetector, acti
 
 def scattering_experiment_plot(d: CylinderDetector, p: StaticParticle, activity, T, gamma) -> (plt.Figure, plt.axis):
     # Generate dataset
-    lors, scatters = p.simulate_emissions(detector=d, n_lor=int(T * activity))
+    lors, scatters = p.simulate_emissions(detector=d, n_emissions=int(T * activity))
 
     # Eval likelihood over slices of detector
     fig, ax = single_dimensional_likelihood_plot(d=d, activity=activity, T=T, gamma=gamma, lors=lors, mu=p.scatter_rate)
@@ -114,7 +114,7 @@ def scattering_experiment_plot(d: CylinderDetector, p: StaticParticle, activity,
 
 def scattering_experiment_plot_only_horizontal(d: CylinderDetector, p: StaticParticle, activity, T, gamma) -> (plt.Figure, plt.axis):
     # Generate dataset
-    lors, scatters = p.simulate_emissions(detector=d, n_lor=int(T * activity))
+    lors, scatters = p.simulate_emissions(detector=d, n_emissions=int(T * activity))
 
     # Eval likelihood over slices of detector
     fig, ax = single_dimensional_likelihood_plot_only_horizontal(d=d, activity=activity, T=T, gamma=gamma, lors=lors, mu=p.scatter_rate)

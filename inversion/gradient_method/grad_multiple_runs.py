@@ -13,7 +13,7 @@ p = StaticParticle()
 p.set_position_cartesian(x=0.12, y=-0.1, z=0.13)
 p.scatter_rate = 0.01
 T, activity = 1.0, 10 ** 4
-lors, scatters = p.simulate_emissions(detector=d, n_lor=int(T * activity))
+lors, scatters = p.simulate_emissions(detector=d, n_emissions=int(T * activity))
 X_actual = np.array(p.get_position_cartesian())
 print('Sim done')
 
@@ -49,8 +49,8 @@ for err in err_history:
 
 t = onp.arange(start=0, stop=len(err_history))
 
+plt.fill_between(x=t, y1=min_err, y2=max_err, color='#86b3cf')
 plt.plot(t, avg_err, label='Average Error')
-plt.fill_between(x=t, y1=min_err, y2=max_err, alpha=0.5)
 plt.plot(t, min_err, '-', c='grey', label='Min Error')
 plt.plot(t, max_err, '--', c='grey', label='Max Error')
 plt.title(f'Gradient Ascent of Likelihood recovering {p.to_str_cartesian()} over n={n_experiments} runs')

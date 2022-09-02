@@ -11,7 +11,7 @@ p = StaticParticle()
 p.set_position_cartesian(x=0.12, y=-0.1, z=0.13)
 p.scatter_rate = 2.0
 T, activity = 1.0, 10 ** 4
-lors, scatters = p.simulate_emissions(detector=d, n_lor=int(T * activity))
+lors, scatters = p.simulate_emissions(detector=d, n_emissions=int(T * activity))
 X_actual = np.array(p.get_position_cartesian())
 print('Sim done')
 

@@ -157,14 +157,14 @@ class StaticParticle(Point):
 
         return np.matmul(rot_phi, rot_theta)
 
-    def simulate_emissions(self, detector: Detector, n_lor=0.05 * (10 ** 4), debug_ax=None):
+    def simulate_emissions(self, detector: Detector, n_emissions=0.05 * (10 ** 4), debug_ax=None):
         if debug_ax is not None:
             point_3d(debug_ax, self.get_position_cartesian(), color='r', label='Particle Position')
 
         impacts = []
         n_scatters = 0
 
-        for _ in range(n_lor):  # For each requested LOR
+        for _ in range(n_emissions):  # For each requested LOR
             varphi = np.random.uniform(0, 2 * np.pi)
             theta = np.arccos(1 - np.random.uniform(0, 1))  # Inverse Transform Sampling
 
