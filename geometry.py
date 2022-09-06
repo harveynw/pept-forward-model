@@ -6,6 +6,10 @@ from typing import Union, List
 from matplotlib.patches import Polygon
 from numpy.linalg import LinAlgError
 
+# In this file, defines the Point base class and some miscellaneous geometry/computer graphics algorithms that
+# were not used in the end for the inversion algorithm.
+
+
 Coordinate = Union[np.ndarray, tuple, list]
 
 
@@ -143,12 +147,33 @@ class RectangleQuadrilateral(Quadrilateral):
 
 
 def atan2(x: float, y: float):
-    # Returns the azimuthal angle of a 2D cartesian point in the range [0, 2π]
+    """ Numpy ARCTAN2
+
+    https://en.wikipedia.org/wiki/Atan2 to range [0, 2π]
+
+    Args:
+        x: point x coordinate
+        y: point y coordinate
+
+    Returns:
+        Azimuthal angle in [0, 2π]
+    """
     angle = np.arctan2(y, x)
     return angle if angle > 0.0 else 2 * np.pi + angle
 
 
 def barycentric_coords_from_triangle(p: np.ndarray, verts: list):
+    """ Barycentric coordinates of point
+
+    Finds the barycentric coordinates of a point relative to a triangle.
+
+    Args:
+        p: The point
+        verts: List of numpy 2D vertices of the triangle
+
+    Returns:
+        2D barycentric coordinates.
+    """
     p1, p2, p3 = verts
 
     T = np.array([[p1[0]-p3[0], p2[0]-p3[0]],
@@ -161,11 +186,24 @@ def barycentric_coords_from_triangle(p: np.ndarray, verts: list):
 
 
 def line_segments_intersection(p1: Coordinate, n1: Coordinate, p2: Coordinate, n2: Coordinate):
-    # Find 2d intersection point of the line segments p1 + λ*n1, p2 + µ*n2 with λ,µ ∈ [0,1]
+    """ Intersection point of 2D line segments
+
+    Finds the intersection point of the two line segments p1 + λ*n1, p2 + µ*n2
+     assuming λ,µ ∈ [0,1].
+
+    Args:
+        p1: Line segment 1 start
+        n1: Line segment 1 direction
+        p2: Line segment 2 start
+        n2: Line segment 2 direction
+
+    Returns:
+        2D coordinate of intersection, or None if not found.
+    """
     try:
         coeff = np.linalg.solve(np.array([n1, n2]).transpose(), np.array(p2) - np.array(p1))
     except LinAlgError:
-        return None
+        return None  # Parallel
 
     lam, mu = coeff[0], -coeff[1]
 
@@ -175,7 +213,18 @@ def line_segments_intersection(p1: Coordinate, n1: Coordinate, p2: Coordinate, n
         return None  # Not on both line segments
 
 
-def rect_quad_intersection_area(rect: RectangleQuadrilateral, quad: Union[Quadrilateral, MultiQuadrilateral]):
+def rect_quad_intersection_area(rect: RectangleQuadrilateral, quad: Union[Quadrilateral, MultiQuadrilateral]) -> float:
+    """Intersection area between a Rectangle and Quadrilateral(s)
+
+    Finds the intersection polygon between rect and quad, and then computes its area
+
+    Args:
+        rect: The rectangle
+        quad: The quadrilateral(s)
+
+    Returns:
+        area, float
+    """
     if isinstance(quad, MultiQuadrilateral):
         return sum([rect_quad_intersection_area(rect, q) for q in quad.quads])
 
@@ -214,12 +263,26 @@ def rect_quad_intersection_area(rect: RectangleQuadrilateral, quad: Union[Quadri
 
 
 def area_of_triangle(v1: Coordinate, v2: Coordinate, v3: Coordinate):
-    # Area computed using shoelace formula
+    """Area of a triangle
+
+    Computes the area of a triangle from its vertices, using the shoelace formula
+    """
     return 0.5 * ((v1[0]-v3[0])*(v2[1]-v1[1]) - (v1[0]-v2[0])*(v3[1]-v1[1]))
 
 
 def points_to_convex_polygon(points: List[Coordinate]) -> List[Coordinate]:
-    # Takes an unordered list of points and orders them to form a convex polygon
+    """Collection of points to an ordered list of vertices for a convex polygon
+
+    Sorts a list of 2D points into an ordered list of convex polygon vertices.
+    This works in principle by comparing the complex argument of each point.
+
+    Args:
+        points: List of 2D points
+
+    Returns:
+        list of points corresponding to a convex polygon
+    """
+    # Ensure numpy array
     points = np.array(points)
 
     # Centroid is always an interior point
@@ -233,8 +296,17 @@ def points_to_convex_polygon(points: List[Coordinate]) -> List[Coordinate]:
 
 
 def inside_quad(x: Coordinate, quad_points: np.ndarray) -> bool:
-    # x inside quadrilateral test,
-    # quad_points must be clockwise or counter-clockwise
+    """Point inside quadrilateral test
+
+    Tests if a 2D point lies within a quadrilateral
+
+    Args:
+        x: 2D point
+        quad_points: numpy array containing vertices of the quad
+
+    Returns:
+        bool result of the test
+    """
     p1, p2, p3, p4 = quad_points
 
     b_1 = barycentric_coords_from_triangle(p=np.array(x), verts=[p1, p2, p3])
@@ -243,58 +315,22 @@ def inside_quad(x: Coordinate, quad_points: np.ndarray) -> bool:
     return np.all(((b_1 >= 0) & (b_1 <= 1)) | ((b_2 >= 0) & (b_2 <= 1)))
 
 
-def phi_proj(R: float, X: np.ndarray, phi: float) -> float:
-    s, c = np.sin(phi), np.cos(phi)
-    c_1, c_2 = X[0] - R*c, X[1] - R*s
-    omega = -2*R*(c * c_1 + s * c_2)/(np.square(c_1) + np.square(c_2))
+def random_point_within_cylinder(radius: float, height: float):
+    """Random point within a cylinder
 
-    return atan2(R*s + omega*c_2, R*c + omega*c_1)
+    Generates a random cartesian point (uniformly) in a cylinder, which is
+    assumed to have its center at the origin.
 
+    Args:
+        radius: radius of cylinder
+        height: height of cylinder
 
-def z_proj(R: float, X: np.ndarray, phi: float, z: float) -> float:
-    s, c = np.sin(phi), np.cos(phi)
-    c_1, c_2 = X[0] - R*c, X[1] - R*s
-    omega = -2*R*(c * c_1 + s * c_2)/(np.square(c_1) + np.square(c_2))
+    Returns:
+        shape (3,) numpy array of the sampled point
+    """
 
-    return z + omega*(X[2]-z)
-
-
-def random_point_within_cylinder(radius, height):
-    # Random point within cylinder with center at the origin
     z = np.random.uniform(-height/2.0, height/2.0)
     while True:
         x, y = np.random.uniform(-radius, radius), np.random.uniform(-radius, radius)
         if np.sqrt(x**2 + y**2) < radius:
             return np.array([x, y, z])
-
-
-if __name__ == '__main__':
-    # Some testing
-
-    # Test: inside_quad
-
-    # p1, p2, p3, p4 = np.array([0.0, 0.0]), np.array([1.0, 0.0]), \
-    #     np.array([1.0, 1.0]), np.array([0.0, 1.0])
-    # print(inside_quad(np.array([0.25, 0.25]), [p1, p2, p3, p4]))
-    # print(inside_quad(np.array([0.5, 1.001]), [p1, p2, p3, p4]))
-
-    # Test: points_to_convex_polygon
-
-    # print(points_to_convex_polygon([p1, p3, p4, p2]))
-
-    # Test: rect_quad_intersection_area
-
-    a1, a2, a3, a4 = [1, 1], [1, 2], [2, 2], [2, 1]
-    quad = Quadrilateral(a1, a2, a3, a4)
-    rect = RectangleQuadrilateral([0, 0], [1, 1])
-
-    print(rect_quad_intersection_area(rect, quad))
-
-    import matplotlib.pyplot as plt
-    fig, ax = plt.subplots()
-    rect.plot(ax, 'g')
-    quad.plot(ax, 'r')
-    ax.set_xlim([-2, 2]), ax.set_ylim([-2, 2])
-    plt.show()
-
-    exit()
