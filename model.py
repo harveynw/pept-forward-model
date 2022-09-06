@@ -4,10 +4,15 @@ import matplotlib.pyplot as plt
 
 from dataclasses import dataclass
 from plot import point_3d, line_3d, arrow_3d
-from geometry import atan2, Point, Quadrilateral, RectangleQuadrilateral
+from geometry import atan2, Point, RectangleQuadrilateral
 
 
 class Detector:
+    """Abstract detector class
+
+    This was done in case a detector of shape different to a Cylinder was ever implemented.
+    """
+
     @abc.abstractmethod
     def impact(self, lor_normal: np.ndarray, lor_annihilation: np.ndarray) -> (bool, float, float):
         pass
@@ -23,6 +28,12 @@ class Detector:
 
 @dataclass
 class CylinderDetector(Detector):
+    """ CylinderDetector
+
+    Object for storing the detector dimensions and individual cell information.
+    Contains methods for mapping to the cell indices and for plotting.
+    """
+
     dim_radius_cm: float = 0.25
     dim_height_cm: float = 0.50
 
@@ -33,6 +44,18 @@ class CylinderDetector(Detector):
         return -self.dim_height_cm / 2.0 <= z <= self.dim_height_cm / 2.0
 
     def impact(self, lor_normal: np.ndarray, lor_annihilation: np.ndarray):
+        """ Impact detection
+
+        Determines whether a line collides with the detector twice
+
+        Args:
+            lor_normal: The normal specifying the line
+            lor_annihilation: A point on the line
+        Returns:
+            bool: True/false line collided twice
+            float: Line parameter of first collision
+            float: Line parameter of second collision
+        """
         p_x, p_y, p_z = lor_annihilation
         n_1, n_2, n_3 = lor_normal
 
@@ -52,21 +75,58 @@ class CylinderDetector(Detector):
         return did_impact, lambda_1, lambda_2
 
     def impact_forward_only(self, lor_normal: np.ndarray, lor_annihilation: np.ndarray) -> (bool, float):
+        """ Impact detection (single case)
+
+        Determines whether a line collides with the detector once,
+         travelling in the direction of the normal
+
+        Args:
+            lor_normal: The normal specifying the direction of the line
+            lor_annihilation: A point on the line
+        Returns:
+            bool: True/false line collided with detector once
+            float: Line parameter of collision
+        """
         _, _, l = self.impact(lor_normal=lor_normal, lor_annihilation=lor_annihilation)
 
         impact = lor_annihilation + l * lor_normal
         return self._is_z_coordinate_in_detector(impact[2]), l
 
     def n_detector_cells(self) -> (int, int):
+        """ Number of detector cells
+
+        Returns how the detector surface is discretised.
+
+        Returns:
+            n_x: Number of detector cells horizontally in grid
+            n_y: Number of detector cells vertically in grid
+        """
         n_horizontal = np.rint(2 * np.pi * self.dim_radius_cm / self.detectors_width)
         n_vertical = np.rint(self.dim_height_cm / self.detectors_height)
         return int(n_horizontal), int(n_vertical)
 
     def del_detector_cells(self) -> (float, float):
-        n_phi, n_z = self.n_detector_cells()
-        return 2 * np.pi / n_phi, self.dim_height_cm / n_z
+        """ Dimensions of detector cells
+
+        Returns the size of each detector cell in cylindrical coordinate space.
+
+        Returns:
+            d_phi: azimuthal angle across each cell in radians from the origin
+            d_z: z-coordinate height of each cell
+        """
+        n_x, n_y = self.n_detector_cells()
+        return 2 * np.pi / n_x, self.dim_height_cm / n_y
 
     def detector_index_from_impact(self, impact: np.ndarray) -> (int, int):
+        """ Detector cell index from collision
+
+        Returns the horizontal, vertical index of the detector cell in which
+         a cartesian collision point lies.
+
+        Returns:
+            phi_index: Horizontal index over detector surface 0 <= phi_index < n_x
+            z_index: Vertical index over detector surface 0 <= z_index < n_y
+        """
         x, y, z = impact
         phi = atan2(y, x)
 
@@ -82,7 +142,16 @@ class CylinderDetector(Detector):
         return phi_index + n_phi * z_index
 
     def detector_cell_from_index(self, i: int):
-        # Detector cell boundaries in phi, z format
+        """ Detector cell in space from its index
+
+        Takes a detector cell index and returns its surface in cylindrical coordinate space.
+
+        Args:
+            i: The cell index 0 <= i < n_x * n_y
+        Returns:
+            RectangleQuadrilateral: The surface specified in (phi, z) coordinates on
+                the entire detector surface [0, 2π] x [-H/2, H/2]
+        """
         n_x, n_y = self.n_detector_cells()
         assert 0 <= i < n_x * n_y
 
@@ -95,12 +164,22 @@ class CylinderDetector(Detector):
         )
 
     def detector_cells_from_region(self, phi_range: tuple, z_range: tuple):
-        # Cells indices that touch a given rectangular region
+        """ Detector cells from a rectangular region
+
+        Takes a 2D rectangle specified on the detector surface and returns all
+        the cell indices that touch it.
+
+        Args:
+            phi_range: Tuple of the min, max phi values of the rect in [0, 2π]
+            z_range: Tuple of the min, max z values of the rect in [-H/2, H/2]
+        Returns:
+            cells: List of cell indices
+        """
         phi_min, phi_max = phi_range
         z_min, z_max = z_range
 
         n_x, n_y = self.n_detector_cells()
-        d_phi, d_z = 2 * np.pi / n_x, self.dim_height_cm / n_y
+        d_phi, d_z = self.del_detector_cells()
 
         # Range of values by index along dimension
         phi_coords = (np.floor(phi_min / d_phi).astype(int), np.ceil(phi_max / d_phi).astype(int))
@@ -118,7 +197,13 @@ class CylinderDetector(Detector):
         return cells
 
     def debug_plot(self, ax: plt.axis):
-        # Plots the cylinder detector
+        """ Plot cylinder
+
+        Takes a matplotlib axis and plots the cylindrical detector surface
+
+        Args:
+            ax: plt.Axis
+        """
         diameter = 2 * np.pi * self.dim_radius_cm
         n_detectors_horizontal = int(diameter / self.detectors_width)
         n_detectors_vertical = int(self.dim_height_cm / self.detectors_height)
@@ -139,9 +224,16 @@ class StaticParticle(Point):
 
     @staticmethod
     def _generate_scatter_rotation() -> np.ndarray:
-        # Samples a change in trajectory of a particle due to Compton scattering, returning a 3D rotation of the z_axis
+        """ Sample a scatter transformation
+
+        This simulates a change in trajectory of a photon resulting from
+        Compton Scattering (Section 2.2.1), kappa is hardcoded here.
+
+        Returns:
+            np.ndarray: 3D Rotation Matrix
+        """
         phi = np.random.uniform(low=0, high=2 * np.pi)
-        theta = np.random.vonmises(mu=0, kappa=1)
+        theta = np.random.vonmises(mu=0, kappa=5)
 
         rot_theta = np.array([
             [1, 0, 0],
@@ -158,6 +250,20 @@ class StaticParticle(Point):
         return np.matmul(rot_phi, rot_theta)
 
     def simulate_emissions(self, detector: Detector, n_emissions=0.05 * (10 ** 4), debug_ax=None):
+        """ Simulates emissions given a detector
+
+        Simulates a number of emissions, this is Algorithm 1
+         in the report repeated n_emissions times.
+
+        Args:
+            detector: The (cylindrical) detector object
+            n_emissions: Number of emissions to simulate
+            debug_ax (optional): A matplotlib axis to plot each emission
+
+        Returns:
+            impacts: Returns a list of LoRs, List[(detector cell index i, detector cell index j)]
+            n_scatters: Count of the number of photons scattered over all the detected LoRs.
+        """
         if debug_ax is not None:
             point_3d(debug_ax, self.get_position_cartesian(), color='r', label='Particle Position')
 
@@ -173,12 +279,12 @@ class StaticParticle(Point):
                 np.sin(theta)*np.sin(varphi),
                 np.cos(theta)
             ])
-            e_varphi = np.array([
+            n_varphi = np.array([
                 -np.sin(varphi),
                 np.cos(varphi),
                 0.0
             ])
-            e_theta = np.array([
+            n_theta = np.array([
                 -np.cos(theta)*np.cos(varphi),
                 -np.cos(theta)*np.sin(varphi),
                 np.sin(theta)
@@ -218,7 +324,7 @@ class StaticParticle(Point):
                     scatter_point = self.get_position_cartesian() + (np.sign(l) * first_scatter) * n
 
                     # Compute new normal (with a random rotation)
-                    change_of_basis = np.array([e_varphi, e_theta, np.sign(l) * n]).transpose()
+                    change_of_basis = np.array([n_varphi, n_theta, np.sign(l) * n]).transpose()
                     new_n = change_of_basis.dot(self._generate_scatter_rotation().dot([0, 0, 1]))
 
                     if debug_ax is not None:
