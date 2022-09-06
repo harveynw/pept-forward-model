@@ -52,5 +52,5 @@ plt.grid(b=None)
 ax.text(0.0, 0.0, 1.6, r'$z$', horizontalalignment='center',
         verticalalignment='center')
 
-plt.savefig('scatter_angles.eps', format='eps', bbox_inches='tight')
+# plt.savefig('scatter_angles.eps', format='eps', bbox_inches='tight')
 plt.show()

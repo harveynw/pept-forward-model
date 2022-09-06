@@ -9,6 +9,7 @@ from geometry import Quadrilateral, MultiQuadrilateral, phi_proj, z_proj, rect_q
 from model import CylinderDetector, StaticParticle
 from plot import detector_plot
 
+# Integration code that was discarded in the end
 
 def monte_carlo_2d_integral(x_sample_range: tuple, y_sample_range: tuple, integrand: Callable[[float, float], float],
                             rejection_func: Callable[[float, float], bool], n_samples: int = 100):

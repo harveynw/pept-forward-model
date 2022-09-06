@@ -22,7 +22,7 @@ plt.xticks(np.array(ticks)*np.pi, [rf"${i}\pi$" for i in ticks])
 plt.yticks([])
 plt.legend()
 plt.title(r'von Mises PDF for different values of $\kappa$')
-plt.savefig('von_mises.eps', format='eps')
+# plt.savefig('von_mises.eps', format='eps')
 plt.show()
 
 
