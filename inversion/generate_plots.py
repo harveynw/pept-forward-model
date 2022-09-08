@@ -1,6 +1,7 @@
 import jax.numpy as np
 import numpy as onp
 import matplotlib.pyplot as plt
+from jax import vmap
 
 from matplotlib import patches
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -126,6 +127,7 @@ def plot_proj_area(min_phi, min_z, d_phi, d_z, p: StaticParticle, d: CylinderDet
     # Plots characteristic_function(R, detector_j, phi_1, z_1, X, gamma)
     detector_j = np.array([min_phi, min_z, d_phi, d_z])
     X = np.array(p.get_position_cartesian())
+    R, H = d.dim_radius_cm, d.dim_height_cm
 
     fig, ax = plt.subplots()
     plt.rcParams.update({
@@ -134,19 +136,17 @@ def plot_proj_area(min_phi, min_z, d_phi, d_z, p: StaticParticle, d: CylinderDet
     })
     # fig.set_size_inches(8, 20)
 
-    shp = (314 * 2, 50 * 2)
+    shp = (314, 100)
     phi_vals = onp.linspace(0, 2 * onp.pi, num=shp[0])
-    z_vals = onp.linspace(0, 0.5, num=shp[1])
+    z_vals = onp.linspace(-H/2, H/2, num=shp[1])
 
-    img = onp.zeros((len(phi_vals), len(z_vals)))
+    phi_vec = np.array([phi for phi in phi_vals for _ in z_vals])
+    z_vec = np.array([z for _ in phi_vals for z in z_vals])
 
-    for i, phi_samp in enumerate(phi_vals):
-        for j, z_samp in enumerate(z_vals):
-            img[i, j] = characteristic_function(R=d.dim_radius_cm,
-                                                detector_j=detector_j,
-                                                phi_1=phi_samp, z_1=z_samp,
-                                                X=X, gamma=gamma)
+    func = vmap(characteristic_function, (None, None, 0, 0, None, None), 0)
+    vals = func(R, detector_j, phi_vec, z_vec, X, gamma)
 
+    img = onp.array(vals).reshape(shp)
     ax.imshow(img.transpose(), origin='lower')
 
     # Plot original detector
