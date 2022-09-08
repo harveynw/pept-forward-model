@@ -222,8 +222,10 @@ class StaticParticle(Point):
     # Compton Scattering Rate
     scatter_rate: float = 2.0
 
-    @staticmethod
-    def _generate_scatter_rotation() -> np.ndarray:
+    # Scattering angle distribution
+    kappa: float = 5.0
+
+    def generate_scatter_rotation(self) -> np.ndarray:
         """ Sample a scatter transformation
 
         This simulates a change in trajectory of a photon resulting from
@@ -233,7 +235,7 @@ class StaticParticle(Point):
             np.ndarray: 3D Rotation Matrix
         """
         phi = np.random.uniform(low=0, high=2 * np.pi)
-        theta = np.random.vonmises(mu=0, kappa=5)
+        theta = np.random.vonmises(mu=0, kappa=self.kappa)
 
         rot_theta = np.array([
             [1, 0, 0],
@@ -325,7 +327,7 @@ class StaticParticle(Point):
 
                     # Compute new normal (with a random rotation)
                     change_of_basis = np.array([n_varphi, n_theta, np.sign(l) * n]).transpose()
-                    new_n = change_of_basis.dot(self._generate_scatter_rotation().dot([0, 0, 1]))
+                    new_n = change_of_basis.dot(self.generate_scatter_rotation().dot([0, 0, 1]))
 
                     if debug_ax is not None:
                         point_3d(debug_ax, scatter_point, color='darkred', label='Compton Scatter')
